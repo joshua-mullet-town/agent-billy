@@ -1,0 +1,12 @@
+node_modules/
+dist/
+*.log
+.env
+.DS_Store
+output/generated-code/*
+output/generated-tests/*
+output/ui-mockups/*
+output/pr-diffs/*
+!output/*/.gitkeep
+memory/agent-state.json
+logs/*.log

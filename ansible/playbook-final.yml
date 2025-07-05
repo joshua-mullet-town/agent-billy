@@ -1,0 +1,75 @@
+---
+# Complete GiveGrove Development Environment Setup
+# This single playbook sets up both frontend and backend properly
+
+- name: Setup Complete GiveGrove Development Environment
+  hosts: vm_instance
+  become: yes
+  vars:
+    workspace_dir: "/root/GiveGrove"
+    
+  tasks:
+    # ... (existing system setup tasks from playbook.yml)
+    
+    - name: Create Firebase development configuration
+      copy:
+        content: |
+          {
+            "env": {
+              "service_account": "{\"type\":\"service_account\",\"project_id\":\"local-dev\",\"private_key\":\"mock\",\"client_email\":\"mock@local.dev\"}"
+            },
+            "slack": {
+              "webhook": "https://hooks.slack.com/mock"
+            },
+            "twilio": {
+              "account_sid": "mock_sid",
+              "auth_token": "mock_token", 
+              "phone_number": "+15555551234"
+            },
+            "send_grid": {
+              "api_key": "mock_key"
+            },
+            "stripe": {
+              "secret_key": "mock_secret"
+            }
+          }
+        dest: "{{ workspace_dir }}/functions/.runtimeconfig.json"
+        
+    - name: Start frontend development server
+      shell: |
+        cd {{ workspace_dir }}
+        nohup npm run dev -- --host 0.0.0.0 --port 3000 > /tmp/frontend.log 2>&1 &
+        
+    - name: Start backend Firebase emulator
+      shell: |
+        cd {{ workspace_dir }}/functions
+        nohup firebase emulators:start --only functions > /tmp/backend.log 2>&1 &
+        
+    - name: Wait for services to start
+      wait_for:
+        port: "{{ item }}"
+        delay: 10
+      loop:
+        - 3000  # Frontend
+        - 5002  # Backend functions
+        
+    - name: Verify services are working
+      uri:
+        url: "http://localhost:{{ item.port }}{{ item.path | default('/') }}"
+        method: GET
+      loop:
+        - { port: 3000, path: "/" }          # Frontend
+        - { port: 4000, path: "/" }          # Backend UI
+        - { port: 5002, path: "/" }          # Functions
+      register: service_checks
+      
+    - name: Display service status
+      debug:
+        msg: |
+          GiveGrove Development Environment Ready!
+          
+          Frontend: http://{{ ansible_host }}:3000
+          Backend UI: http://{{ ansible_host }}:4000  
+          Functions: http://{{ ansible_host }}:5002
+          
+          Both services can communicate via localhost within the VM.

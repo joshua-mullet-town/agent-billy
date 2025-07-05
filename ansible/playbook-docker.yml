@@ -1,0 +1,561 @@
+---
+- name: Setup GiveGrove Development Environment (Docker Compatible)
+  hosts: all
+  become: yes
+  vars:
+    node_version: "20.17.0"
+    npm_version: "10.6.0"
+    firebase_cli_version: "13.27.0"
+    user_name: "{{ ansible_user | default('testuser') }}"
+    repo_url: "{{ hostvars[inventory_hostname]['repo_url'] | default('https://github.com/south-bend-code-works/GiveGrove.git') }}"
+    repo_dir: "/home/{{ user_name }}/GiveGrove"
+    is_docker: "{{ ansible_virtualization_type == 'docker' or ansible_env.container is defined }}"
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install system dependencies
+      apt:
+        name:
+          - curl
+          - wget
+          - git
+          - build-essential
+          - python3-pip
+          - software-properties-common
+          - apt-transport-https
+          - ca-certificates
+          - gnupg
+          - lsb-release
+        state: present
+
+    - name: Install Docker (skip in Docker container)
+      block:
+        - name: Add Docker GPG key
+          apt_key:
+            url: https://download.docker.com/linux/ubuntu/gpg
+            state: present
+
+        - name: Add Docker repository
+          apt_repository:
+            repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+            state: present
+
+        - name: Install Docker
+          apt:
+            name:
+              - docker-ce
+              - docker-ce-cli
+              - containerd.io
+            state: present
+
+        - name: Add user to docker group
+          user:
+            name: "{{ user_name }}"
+            groups: docker
+            append: yes
+      when: not is_docker
+
+    - name: Install Node.js via NodeSource
+      block:
+        - name: Add NodeSource GPG key
+          apt_key:
+            url: https://deb.nodesource.com/gpgkey/nodesource.gpg.key
+            state: present
+
+        - name: Add NodeSource repository
+          apt_repository:
+            repo: "deb https://deb.nodesource.com/node_20.x {{ ansible_distribution_release }} main"
+            state: present
+
+        - name: Install specific Node.js version
+          shell: |
+            apt-get update
+            apt-get install -y nodejs=20.17.* || apt-get install -y nodejs
+          register: nodejs_install
+
+        - name: Verify Node.js version
+          command: node --version
+          register: node_version_check
+          failed_when: not node_version_check.stdout.startswith('v20.')
+
+    - name: Install global npm packages
+      npm:
+        name: "{{ item }}"
+        global: yes
+        state: present
+      loop:
+        - "firebase-tools@{{ firebase_cli_version }}"
+        - typescript
+        - ts-node
+        - "@anthropic-ai/claude-code"
+
+    - name: Install VS Code (skip in Docker)
+      block:
+        - name: Add Microsoft GPG key
+          apt_key:
+            url: https://packages.microsoft.com/keys/microsoft.asc
+            state: present
+
+        - name: Add VS Code repository
+          apt_repository:
+            repo: "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/trusted.gpg.d/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main"
+            state: present
+
+        - name: Install VS Code
+          apt:
+            name: code
+            state: present
+      when: not is_docker
+
+    - name: Install GUI dependencies (skip in Docker)
+      apt:
+        name:
+          - xvfb
+          - x11vnc
+          - fluxbox
+          - firefox
+          - chromium-browser
+          - dbus-x11
+        state: present
+      when: not is_docker
+
+    - name: Setup development user environment
+      become_user: "{{ user_name }}"
+      become: no
+      block:
+        - name: Clone or copy GiveGrove repository
+          block:
+            - name: Check if repo_url is a file path
+              stat:
+                path: "{{ repo_url }}"
+              register: repo_path_stat
+              delegate_to: localhost
+              when: repo_url.startswith('file://')
+
+            - name: Copy local repository (for Docker testing)
+              copy:
+                src: "{{ repo_url | replace('file://', '') }}/"
+                dest: "{{ repo_dir }}/"
+                remote_src: yes
+                owner: "{{ user_name }}"
+                group: "{{ user_name }}"
+              when: repo_url.startswith('file://')
+              become: yes
+
+            - name: Clone remote repository
+              git:
+                repo: "{{ repo_url }}"
+                dest: "{{ repo_dir }}"
+                force: yes
+              when: not repo_url.startswith('file://')
+
+        - name: Clean existing node_modules (Docker architecture mismatch fix)
+          file:
+            path: "{{ item }}"
+            state: absent
+          loop:
+            - "{{ repo_dir }}/node_modules"
+            - "{{ repo_dir }}/functions/node_modules"
+          when: is_docker
+
+        - name: Install jq for package.json manipulation
+          apt:
+            name: jq
+            state: present
+          become: yes
+
+        - name: Install frontend dependencies (with Docker-compatible fixes)
+          shell: |
+            cd "{{ repo_dir }}"
+            jq 'del(.devDependencies."phantomjs-prebuilt")' package.json > package.json.tmp && mv package.json.tmp package.json
+            jq 'del(.devDependencies.chromedriver)' package.json > package.json.tmp && mv package.json.tmp package.json
+            jq 'del(.devDependencies.nightwatch)' package.json > package.json.tmp && mv package.json.tmp package.json
+            jq '.engines.node = ">= 20.0.0"' package.json > package.json.tmp && mv package.json.tmp package.json
+            npm install --legacy-peer-deps --ignore-engines
+          register: frontend_install
+          retries: 3
+          delay: 10
+          environment:
+            PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true"
+            PHANTOMJS_SKIP_DOWNLOAD: "true"
+          when: is_docker
+
+        - name: Install frontend dependencies (normal install for VMs)
+          npm:
+            path: "{{ repo_dir }}"
+            state: present
+          register: frontend_install_vm
+          retries: 3
+          delay: 10
+          when: not is_docker
+
+        - name: Install backend dependencies
+          npm:
+            path: "{{ repo_dir }}/functions"
+            state: present
+          register: backend_install
+          retries: 3
+          delay: 10
+
+        - name: Install Playwright (skip in Docker)
+          block:
+            - name: Install Playwright browsers
+              command: npx playwright install
+              args:
+                chdir: "{{ repo_dir }}"
+
+            - name: Install Playwright system dependencies
+              command: npx playwright install-deps
+              args:
+                chdir: "{{ repo_dir }}"
+              become: yes
+          when: not is_docker
+
+        - name: Create development helper scripts
+          block:
+            - name: Create environment info script
+              copy:
+                dest: "{{ repo_dir }}/dev-info.sh"
+                mode: '0755'
+                content: |
+                  #!/bin/bash
+                  echo "GiveGrove Development Environment Info"
+                  echo "====================================="
+                  echo ""
+                  echo "Repository: {{ repo_dir }}"
+                  echo "Node.js: $(node --version)"
+                  echo "npm: $(npm --version)"
+                  echo "Firebase CLI: $(firebase --version | head -1)"
+                  echo "Claude Code: $(claude --version 2>/dev/null || echo 'Not authenticated yet')"
+                  echo "Environment: {{ 'Docker Container' if is_docker else 'Virtual Machine' }}"
+                  echo ""
+                  echo "Available commands:"
+                  echo "- Frontend dev: npm run dev"
+                  echo "- Backend dev: cd functions && npm run serve"
+                  echo "- Type check: npm run type-check"
+                  echo "- Lint: npm run lint"
+                  echo "- Full stack: docker-compose up"
+                  echo "- Claude Code: claude"
+                  echo ""
+
+            - name: Create Claude Code setup script
+              copy:
+                dest: "{{ repo_dir }}/setup-claude.sh"
+                mode: '0755'
+                content: |
+                  #!/bin/bash
+                  echo "🤖 Claude Code + Playwright MCP Setup"
+                  echo "====================================="
+                  echo ""
+                  echo "🔑 AUTOMATED AUTHENTICATION SETUP:"
+                  echo "1. Set your API key: export ANTHROPIC_API_KEY='your-api-key'"
+                  echo "2. Run: {{ repo_dir }}/setup-claude-auth.sh"
+                  echo ""
+                  echo "🎭 MANUAL SETUP (if automation fails):"
+                  echo "1. Run: claude"
+                  echo "2. Follow OAuth prompts"
+                  echo "3. Run: claude mcp add playwright npx @playwright/mcp@latest"
+                  echo ""
+                  echo "🧪 VERIFY SETUP:"
+                  echo "Run: claude mcp list"
+                  echo ""
+                  echo "🚀 TEST PLAYWRIGHT MCP:"
+                  echo "claude -p 'Use Playwright MCP to navigate to localhost:3000'"
+                  echo ""
+
+            - name: Create automated Claude Code auth script
+              copy:
+                dest: "{{ repo_dir }}/setup-claude-auth.sh"
+                mode: '0755'
+                content: |
+                  #!/bin/bash
+                  echo "🔑 Setting up Claude Code automated authentication..."
+                  
+                  if [ -z "$ANTHROPIC_API_KEY" ]; then
+                    echo "❌ ANTHROPIC_API_KEY not set!"
+                    echo "Run: export ANTHROPIC_API_KEY='your-api-key-here'"
+                    echo "Get your API key from: https://console.anthropic.com/"
+                    exit 1
+                  fi
+                  
+                  echo "✅ API key found in environment"
+                  
+                  # Create .claude directory
+                  mkdir -p ~/.claude
+                  
+                  # Create API key helper script
+                  cat > ~/.claude/anthropic_key_helper.sh << 'EOF'
+                  #!/bin/bash
+                  echo ${ANTHROPIC_API_KEY}
+                  EOF
+                  
+                  chmod +x ~/.claude/anthropic_key_helper.sh
+                  
+                  # Configure Claude Code to use the helper
+                  claude config set --global apiKeyHelper ~/.claude/anthropic_key_helper.sh
+                  
+                  echo "✅ Claude Code authentication configured"
+                  
+                  # Add Playwright MCP automatically
+                  echo "🎭 Adding Playwright MCP..."
+                  claude mcp add playwright npx @playwright/mcp@latest
+                  
+                  echo "✅ Playwright MCP added"
+                  
+                  # Verify setup
+                  echo "🧪 Verifying setup..."
+                  claude mcp list
+                  
+                  echo ""
+                  echo "🎉 Claude Code + Playwright MCP ready for automation!"
+                  echo ""
+                  echo "Test with: claude -p 'Use Playwright MCP to navigate to localhost:3000'"
+
+            - name: Create Agent Billy full setup script
+              copy:
+                dest: "{{ repo_dir }}/setup-agent-billy.sh"
+                mode: '0755'
+                content: |
+                  #!/bin/bash
+                  echo "🤖 Agent Billy Full Environment Setup"
+                  echo "====================================="
+                  echo ""
+                  
+                  # Check for required environment variables
+                  missing_vars=()
+                  
+                  if [ -z "$ANTHROPIC_API_KEY" ]; then
+                    missing_vars+=("ANTHROPIC_API_KEY")
+                  fi
+                  
+                  if [ -z "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
+                    missing_vars+=("GOOGLE_APPLICATION_CREDENTIALS")
+                  fi
+                  
+                  if [ ${#missing_vars[@]} -ne 0 ]; then
+                    echo "❌ Missing required environment variables:"
+                    for var in "${missing_vars[@]}"; do
+                      echo "   - $var"
+                    done
+                    echo ""
+                    echo "Setup instructions:"
+                    echo "1. export ANTHROPIC_API_KEY='your-claude-api-key'"
+                    echo "2. export GOOGLE_APPLICATION_CREDENTIALS='~/GiveGrove/firebase-service-account.json'"
+                    echo ""
+                    exit 1
+                  fi
+                  
+                  echo "✅ Environment variables configured"
+                  
+                  # Setup Claude Code authentication
+                  echo "🔑 Setting up Claude Code..."
+                  if ! command -v claude &> /dev/null; then
+                    echo "❌ Claude Code CLI not found. Installing..."
+                    npm install -g @anthropic-ai/claude-code
+                  fi
+                  
+                  # Run Claude auth setup
+                  ./setup-claude-auth.sh
+                  
+                  # Verify Firebase CLI can authenticate and access config
+                  echo "🔥 Testing Firebase authentication..."
+                  if firebase projects:list &> /dev/null; then
+                    echo "✅ Firebase authentication working"
+                    
+                    # Test access to functions config (this downloads real keys!)
+                    echo "⚠️  Testing Firebase config access (downloads real production keys)..."
+                    cd functions
+                    if firebase functions:config:get &> /dev/null; then
+                      echo "✅ Firebase config access working"
+                      echo "⚠️  Agent Billy can now download real API keys for local testing"
+                    else
+                      echo "❌ Firebase config access failed"
+                      echo "Service account needs additional IAM roles:"
+                      echo "- roles/cloudfunctions.admin"
+                      echo "- roles/firebase.developAdmin" 
+                      echo "- roles/firebaseextensions.viewer"
+                      exit 1
+                    fi
+                    cd ..
+                  else
+                    echo "❌ Firebase authentication failed"
+                    echo "Check GOOGLE_APPLICATION_CREDENTIALS and service account permissions"
+                    exit 1
+                  fi
+                  
+                  # Test development server startup
+                  echo "🚀 Testing development environment..."
+                  echo "Starting frontend dev server (will stop after 5 seconds)..."
+                  timeout 5s npm run dev || true
+                  
+                  echo ""
+                  echo "🎉 Agent Billy is ready for autonomous development!"
+                  echo ""
+                  echo "🧪 Quick tests:"
+                  echo "- Frontend: npm run dev"
+                  echo "- Backend: cd functions && npm run serve  # ⚠️ Downloads real API keys!"
+                  echo "- Claude: claude -p 'Help me implement a new feature'"
+                  echo "- Playwright: claude -p 'Use Playwright MCP to test localhost:3000'"
+                  echo ""
+                  echo "⚠️  SECURITY REMINDER:"
+                  echo "Agent Billy now has access to real production API keys via Firebase config."
+                  echo "Local functions will use real Stripe, SendGrid, Twilio credentials."
+                  echo "Ensure VM is properly secured and isolated!"
+                  echo ""
+
+            - name: Create quick test script
+              copy:
+                dest: "{{ repo_dir }}/quick-test.sh"
+                mode: '0755'
+                content: |
+                  #!/bin/bash
+                  echo "🧪 Quick GiveGrove Test"
+                  echo "====================="
+                  echo ""
+                  
+                  echo "📗 Node.js: $(node --version)"
+                  echo "📦 npm: $(npm --version)"
+                  echo "🔥 Firebase: $(firebase --version | head -1)"
+                  echo ""
+                  
+                  echo "📁 Checking repository..."
+                  if [ -f "package.json" ]; then
+                    echo "✅ package.json found"
+                  else
+                    echo "❌ package.json not found"
+                  fi
+                  
+                  if [ -d "node_modules" ]; then
+                    echo "✅ Frontend dependencies installed"
+                  else
+                    echo "❌ Frontend dependencies missing"
+                  fi
+                  
+                  if [ -d "functions/node_modules" ]; then
+                    echo "✅ Backend dependencies installed"
+                  else
+                    echo "❌ Backend dependencies missing"
+                  fi
+                  
+                  echo ""
+                  echo "🚀 Testing type check..."
+                  if npm run type-check; then
+                    echo "✅ Type check passed"
+                  else
+                    echo "❌ Type check failed"
+                  fi
+                  
+                  echo ""
+                  echo "🧹 Testing lint..."
+                  if npm run lint; then
+                    echo "✅ Lint passed"
+                  else
+                    echo "❌ Lint failed"
+                  fi
+
+    - name: Create secrets documentation
+      copy:
+        dest: "{{ repo_dir }}/SECRETS_SETUP.md"
+        content: |
+          # Secrets Setup for GiveGrove Development
+
+          This file contains instructions for setting up the required secrets and configuration files.
+
+          ## Required Files
+
+          ### 1. Environment Files
+          The following encrypted environment files were found in the repository:
+          - `.env.enc` (main environment file)
+          - `.env.test.enc` (test environment file)
+
+          You'll need to decrypt these or create new `.env` files with the required variables.
+
+          ### 2. Firebase Service Account
+          Create: `functions/src/utils/firebase-cert.json`
+          This should contain your Firebase service account private key JSON.
+
+          ### 3. External Service Keys
+          Based on the dependencies, you'll likely need keys for:
+          - Stripe (payment processing)
+          - SendGrid (email)
+          - Twilio (SMS)
+          - Algolia (search)
+          - Google Maps API
+
+          ## Environment Variables Template
+          Create `.env` file in the root directory with:
+          ```
+          # Firebase
+          VITE_FIREBASE_API_KEY=your_api_key
+          VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+          VITE_FIREBASE_PROJECT_ID=your_project_id
+          VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+          VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+          VITE_FIREBASE_APP_ID=your_app_id
+
+          # External Services
+          STRIPE_PUBLISHABLE_KEY=pk_test_...
+          SENDGRID_API_KEY=SG....
+          TWILIO_ACCOUNT_SID=AC...
+          ALGOLIA_APP_ID=...
+          GOOGLE_MAPS_API_KEY=...
+          
+          # Claude Code Authentication (for Agent Billy)
+          ANTHROPIC_API_KEY=sk-ant-api03-...
+          ```
+          
+          ## Claude Code API Key Setup
+          1. Get your API key from: https://console.anthropic.com/
+          2. Set environment variable: `export ANTHROPIC_API_KEY='your-key-here'`
+          3. Run automated setup: `~/GiveGrove/setup-claude-auth.sh`
+          
+          ## Firebase Service Account Setup (IMPORTANT - Downloads Real Config!)
+          
+          ⚠️  WARNING: `npm run serve` downloads REAL production API keys from Firebase!
+          
+          Required Service Account IAM Roles:
+          - roles/cloudfunctions.admin (Cloud Functions Admin)
+          - roles/iam.serviceAccountUser (Service Account User)  
+          - roles/firebase.developAdmin (Firebase Develop Admin)
+          - roles/firebaseextensions.viewer (Firebase Extensions Viewer)
+          
+          Setup Steps:
+          1. Create service account in Firebase Console with above roles
+          2. Download service account JSON file
+          3. Save as: `~/GiveGrove/firebase-service-account.json`
+          4. Set environment: `export GOOGLE_APPLICATION_CREDENTIALS=~/GiveGrove/firebase-service-account.json`
+          
+          ⚠️  This allows Agent Billy to download real Stripe/SendGrid/Twilio keys for local testing!
+
+          ## Security Note
+          Never commit real secrets to version control.
+
+    - name: Display completion message
+      debug:
+        msg: |
+          🎉 GiveGrove + Claude Code development environment setup complete!
+          
+          Repository: {{ repo_dir }}
+          Environment: {{ 'Docker Container' if is_docker else 'Virtual Machine' }}
+          
+          🧪 Test your installation:
+          - Run info script: {{ repo_dir }}/dev-info.sh
+          - Run quick test: {{ repo_dir }}/quick-test.sh
+          
+          🚀 Start development:
+          - Frontend: cd {{ repo_dir }} && npm run dev
+          - Backend: cd {{ repo_dir }}/functions && npm run serve
+          - Type check: cd {{ repo_dir }} && npm run type-check
+          
+          🤖 Setup Agent Billy (Full Automation):
+          - Set API keys: export ANTHROPIC_API_KEY='key' && export GOOGLE_APPLICATION_CREDENTIALS='path'
+          - Run full setup: {{ repo_dir }}/setup-agent-billy.sh
+          - Or step-by-step: {{ repo_dir }}/setup-claude.sh
+          
+          🎭 Test automation: claude -p 'Use Playwright MCP to navigate to localhost:3000'
+          
+          🚀 Ready for fully autonomous Agent Billy development!

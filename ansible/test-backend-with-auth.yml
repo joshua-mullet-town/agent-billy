@@ -1,0 +1,102 @@
+---
+# Test Backend Actually Starts with Firebase Authentication
+- name: Test Backend Startup with Firebase Auth
+  hosts: vm_instance
+  become: yes
+  vars_files:
+    - secrets.yml
+  vars:
+    workspace_dir: "/root/GiveGrove"
+    
+  tasks:
+    # Use the authenticated repo clone
+    - name: Remove existing directory if it exists
+      shell: rm -rf {{ workspace_dir }}
+      
+    - name: Clone repository with authentication
+      git:
+        repo: "https://{{ vault_github_username }}:{{ vault_github_token }}@github.com/south-bend-code-works/GiveGrove.git"
+        dest: "{{ workspace_dir }}"
+
+    # Make sure Firebase auth is set up
+    - name: Ensure Firebase service account exists
+      copy:
+        content: "{{ vault_firebase_service_account_json }}"
+        dest: "/root/.firebase-service-account.json"
+        mode: '0600'
+
+    # Install dependencies if needed
+    - name: Install frontend dependencies
+      npm:
+        path: "{{ workspace_dir }}"
+        state: present
+
+    - name: Install backend dependencies
+      npm:
+        path: "{{ workspace_dir }}/functions"
+        state: present
+
+    # Build functions with auth
+    - name: Build functions with Firebase auth
+      shell: |
+        cd {{ workspace_dir }}/functions
+        export GOOGLE_APPLICATION_CREDENTIALS="/root/.firebase-service-account.json"
+        npm run build
+      register: build_result
+
+    # Create runtime config for functions
+    - name: Create Firebase runtime config
+      copy:
+        content: |
+          {
+            "env": {
+              "service_account": {{ vault_firebase_service_account_json | to_json }}
+            }
+          }
+        dest: "{{ workspace_dir }}/functions/.runtimeconfig.json"
+
+    # THE BIG TEST: Start backend with auth and check if functions load
+    - name: Start backend with authentication
+      shell: |
+        cd {{ workspace_dir }}/functions
+        export GOOGLE_APPLICATION_CREDENTIALS="/root/.firebase-service-account.json"
+        timeout 30s firebase emulators:start --only functions > /tmp/backend-auth-test.log 2>&1 &
+        sleep 15
+
+    - name: Check if functions actually loaded
+      shell: |
+        # Check if functions are listed in the emulator
+        if curl -s http://localhost:4000/functions 2>/dev/null | grep -q "function"; then
+          echo "✅ FUNCTIONS LOADED"
+        else
+          echo "❌ FUNCTIONS NOT LOADED"
+        fi
+        
+        # Check backend log for exports
+        if grep -q "exports\." /tmp/backend-auth-test.log 2>/dev/null; then
+          echo "✅ EXPORTS FOUND IN LOG"
+        else
+          echo "❌ NO EXPORTS IN LOG"
+        fi
+        
+        # Show recent log
+        echo "=== Recent backend log ==="
+        tail -10 /tmp/backend-auth-test.log 2>/dev/null || echo "No log found"
+      register: function_test
+
+    - name: Display test results
+      debug:
+        msg: "{{ function_test.stdout }}"
+
+    - name: Final verification
+      debug:
+        msg: |
+          🔍 Backend Authentication Test Results:
+          
+          The question was: Can Firebase authentication actually start the backend with functions loading?
+          
+          Check the output above for:
+          ✅ FUNCTIONS LOADED - means backend is serving functions
+          ✅ EXPORTS FOUND IN LOG - means functions compiled and loaded
+          
+          If both show ✅, then we've proven the full flow works!

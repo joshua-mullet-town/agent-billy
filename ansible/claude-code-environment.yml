@@ -1,0 +1,264 @@
+---
+# Complete Claude Code + Playwright MCP Environment
+- name: Setup Claude Code with Playwright MCP Environment
+  hosts: vm_instance
+  become: yes
+  vars_files:
+    - secrets.yml
+  vars:
+    workspace_dir: "/root/GiveGrove"
+    claude_cli_version: "latest"
+    
+  tasks:
+    # First run the complete base environment
+    - name: Include base GiveGrove environment
+      include_tasks: complete-environment.yml
+
+    # Node.js and system dependencies for Claude Code
+    - name: Install additional system dependencies for Claude Code
+      apt:
+        name:
+          - curl
+          - wget
+          - unzip
+          - software-properties-common
+          - apt-transport-https
+          - ca-certificates
+          - gnupg
+          - lsb-release
+        state: present
+        update_cache: yes
+
+    # Install Claude Code CLI
+    - name: Download Claude Code CLI installer
+      get_url:
+        url: "https://claude.ai/cli/install.sh"
+        dest: "/tmp/claude-install.sh"
+        mode: '0755'
+
+    - name: Install Claude Code CLI
+      shell: |
+        bash /tmp/claude-install.sh
+        echo 'export PATH="$HOME/.claude/bin:$PATH"' >> /root/.bashrc
+      environment:
+        SHELL: /bin/bash
+
+    - name: Source bashrc to get Claude in PATH
+      shell: source /root/.bashrc
+      args:
+        executable: /bin/bash
+
+    # Setup Claude Code authentication
+    - name: Create Claude Code config directory
+      file:
+        path: "/root/.claude"
+        state: directory
+        mode: '0700'
+
+    - name: Setup Claude Code authentication
+      copy:
+        content: "{{ vault_claude_api_key }}"
+        dest: "/root/.claude/auth"
+        mode: '0600'
+      when: vault_claude_api_key is defined
+
+    # Install and setup Playwright with browsers
+    - name: Install Playwright
+      npm:
+        name: playwright
+        global: yes
+
+    - name: Install Playwright browsers
+      shell: |
+        /usr/bin/npx playwright install chromium firefox webkit
+        /usr/bin/npx playwright install-deps
+      environment:
+        PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "false"
+
+    # Setup Playwright MCP in the workspace
+    - name: Navigate to workspace and setup Playwright MCP
+      shell: |
+        cd {{ workspace_dir }}
+        export PATH="$HOME/.claude/bin:$PATH"
+        source /root/.bashrc
+        claude mcp add @playwright/mcp@latest
+      args:
+        executable: /bin/bash
+      environment:
+        PLAYWRIGHT_HEADLESS: "false"
+        DISPLAY: ":99"
+
+    # Create Claude Code MCP configuration
+    - name: Create Claude Code MCP configuration
+      copy:
+        content: |
+          {
+            "mcpServers": {
+              "playwright": {
+                "command": "npx",
+                "args": ["@playwright/mcp@latest"],
+                "env": {
+                  "PLAYWRIGHT_HEADLESS": "false",
+                  "DISPLAY": ":99"
+                }
+              }
+            }
+          }
+        dest: "{{ workspace_dir }}/.claude-mcp.json"
+        mode: '0644'
+
+    # Setup GUI environment for headed browser testing
+    - name: Ensure X virtual framebuffer is running
+      shell: |
+        pkill Xvfb || true
+        Xvfb :99 -screen 0 1920x1080x24 &
+        sleep 2
+      args:
+        executable: /bin/bash
+
+    - name: Ensure window manager is running
+      shell: |
+        export DISPLAY=:99
+        pkill fluxbox || true
+        DISPLAY=:99 fluxbox &
+        sleep 2
+      args:
+        executable: /bin/bash
+      environment:
+        DISPLAY: ":99"
+
+    - name: Start VNC server for GUI access
+      shell: |
+        export DISPLAY=:99
+        pkill x11vnc || true
+        DISPLAY=:99 x11vnc -display :99 -forever -shared -bg -nopw -xkb -listen 0.0.0.0 -rfbport 5900
+        sleep 2
+      args:
+        executable: /bin/bash
+      environment:
+        DISPLAY: ":99"
+
+    # Test Claude Code installation
+    - name: Test Claude Code installation
+      shell: |
+        export PATH="$HOME/.claude/bin:$PATH"
+        source /root/.bashrc
+        cd {{ workspace_dir }}
+        claude --version
+      args:
+        executable: /bin/bash
+      register: claude_version_check
+      ignore_errors: yes
+
+    - name: Display Claude Code version
+      debug:
+        msg: "Claude Code version: {{ claude_version_check.stdout }}"
+      when: claude_version_check.rc == 0
+
+    # Test Playwright MCP setup
+    - name: Test Playwright MCP setup
+      shell: |
+        export PATH="$HOME/.claude/bin:$PATH"
+        export DISPLAY=:99
+        source /root/.bashrc
+        cd {{ workspace_dir }}
+        timeout 30s claude -p "Test Playwright MCP by navigating to http://localhost:3000 and taking a screenshot. Respond with 'PLAYWRIGHT_TEST_COMPLETE' when done." --allowedTools PlaywrightMCP || echo "Test completed or timed out"
+      args:
+        executable: /bin/bash
+      environment:
+        DISPLAY: ":99"
+        PLAYWRIGHT_HEADLESS: "false"
+      register: playwright_test
+      ignore_errors: yes
+
+    # Create helpful scripts for manual testing
+    - name: Create Claude Code test script
+      copy:
+        content: |
+          #!/bin/bash
+          export PATH="$HOME/.claude/bin:$PATH"
+          export DISPLAY=:99
+          source /root/.bashrc
+          cd {{ workspace_dir }}
+          
+          echo "🤖 Testing Claude Code + Playwright MCP Environment"
+          echo "=============================================="
+          
+          echo "1. Testing Claude Code CLI..."
+          claude --version
+          
+          echo "2. Testing Playwright MCP integration..."
+          claude -p "Use Playwright MCP to navigate to http://localhost:3000 and verify the GiveGrove application is loading correctly. Take a screenshot and respond with a brief status report." --allowedTools PlaywrightMCP
+          
+          echo "3. Environment ready for autonomous development!"
+        dest: "/root/test-claude-environment.sh"
+        mode: '0755'
+
+    - name: Create headless task execution script
+      copy:
+        content: |
+          #!/bin/bash
+          export PATH="$HOME/.claude/bin:$PATH"
+          export DISPLAY=:99
+          source /root/.bashrc
+          cd {{ workspace_dir }}
+          
+          # Example headless task execution
+          # Usage: ./execute-task.sh "Your task description here"
+          
+          TASK="$1"
+          if [ -z "$TASK" ]; then
+            echo "Usage: $0 'Your task description'"
+            exit 1
+          fi
+          
+          echo "🤖 Executing task: $TASK"
+          echo "================================"
+          
+          claude -p "$TASK Use Playwright MCP for testing if needed. Document your progress and respond with 'TASK_COMPLETED: [summary]' when finished." \
+            --allowedTools Edit,Bash,PlaywrightMCP,Read,Write \
+            --output-format stream-json
+        dest: "/root/execute-task.sh"
+        mode: '0755'
+
+    # Final verification
+    - name: Verify all services are running
+      shell: |
+        echo "=== Service Status ==="
+        ps aux | grep -E "(vite|firebase|Xvfb|fluxbox|x11vnc)" | grep -v grep || echo "Some services may not be running"
+        
+        echo "=== Port Status ==="
+        ss -tlnp | grep -E ":3000|:4000|:5900" || echo "Some ports may not be listening"
+        
+        echo "=== Frontend Test ==="
+        curl -s -o /dev/null -w "Frontend HTTP Status: %{http_code}\n" http://localhost:3000/ || echo "Frontend not accessible"
+        
+        echo "=== Backend Test ==="
+        curl -s -o /dev/null -w "Backend HTTP Status: %{http_code}\n" http://localhost:4000/ || echo "Backend not accessible"
+      register: final_verification
+
+    - name: Display final verification results
+      debug:
+        var: final_verification.stdout_lines
+
+    # Display success message
+    - name: Display setup completion message
+      debug:
+        msg: |
+          🎉 Claude Code + Playwright MCP Environment Ready!
+          
+          🤖 Claude Code CLI: Installed and configured
+          🎭 Playwright MCP: Available for headed browser testing
+          🖥️  GUI Environment: VNC accessible on port 5900
+          🌐 Frontend: http://{{ ansible_host }}:3000
+          🔧 Backend: http://{{ ansible_host }}:4000
+          
+          🚀 Ready for autonomous development tasks!
+          
+          Test commands:
+          - ssh root@{{ ansible_host }} "/root/test-claude-environment.sh"
+          - ssh root@{{ ansible_host }} "/root/execute-task.sh 'Add a new button to the homepage'"
+          
+          GUI Access: VNC to {{ ansible_host }}:5900 (no password)
+          
+          This environment is now ready for Agent Billy to execute development tasks!

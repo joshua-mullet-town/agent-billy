@@ -1,0 +1,11 @@
+all:
+  children:
+    givegrove_dev:
+      hosts:
+        localhost:
+          ansible_connection: local
+          ansible_user: testuser
+      vars:
+        repo_url: 'file:///workspace'
+        home_dir: '/home/testuser'
+        repo_dir: '/home/testuser/GiveGrove'

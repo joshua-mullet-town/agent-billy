@@ -77,7 +77,7 @@ export class WebhookServer {
     }
 
     // Check for label-based triggers
-    if (action === 'labeled' && issue.labels.some((l: any) => l.name === 'agent-billy')) {
+    if (action === 'labeled' && issue.labels.some((l: any) => l.name === 'for-billy')) {
       console.log(`🏷️  Issue #${issue.number} labeled for Billy - processing`);
       await this.billy.checkAndHandleAssignedIssuesWithVM();
     }

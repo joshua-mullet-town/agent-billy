@@ -25,5 +25,5 @@ USER billy
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD node -e "console.log('Billy is alive')" || exit 1
 
-# Run Billy webhook server
-CMD ["npm", "run", "billy:serve"]
+# Run Billy in watch mode with polling
+CMD ["npm", "run", "billy:watch", "--", "--interval", "60"]

@@ -325,6 +325,7 @@ Agent Billy 🤖`
       console.log(`📊 Health check: http://localhost:${port}/health`);
       console.log(`🎣 Webhook endpoint: http://localhost:${port}/webhooks/github`);
       console.log(`🧠 Mode: Stateless (no memory required)`);
+      console.log(`🚫 Memory: Not needed - all state from GitHub`);
     });
   }
 }

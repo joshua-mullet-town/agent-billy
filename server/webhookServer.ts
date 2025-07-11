@@ -73,13 +73,13 @@ export class WebhookServer {
     // Trigger Billy when issues are assigned to him
     if (action === 'assigned' && assignee?.login === process.env.AGENT_USERNAME) {
       console.log(`🎯 Billy assigned to issue #${issue.number} - processing`);
-      await this.billy.checkAndHandleAssignedIssuesWithVM();
+      await this.billy.checkAndHandleAssignedIssues();
     }
 
     // Check for label-based triggers
     if (action === 'labeled' && issue.labels.some((l: any) => l.name === 'for-billy')) {
       console.log(`🏷️  Issue #${issue.number} labeled for Billy - processing`);
-      await this.billy.checkAndHandleAssignedIssuesWithVM();
+      await this.billy.checkAndHandleAssignedIssues();
     }
   }
 
@@ -94,13 +94,13 @@ export class WebhookServer {
     // Check if Billy was mentioned
     if (comment.body.includes('@agent-billy') || comment.body.includes('@' + process.env.AGENT_USERNAME)) {
       console.log(`🔔 Billy mentioned in issue #${issue.number} - processing`);
-      await this.billy.checkAndHandleAssignedIssuesWithVM();
+      await this.billy.checkAndHandleAssignedIssues();
     }
 
     // Check for clarification responses (any comment from non-Billy users)
     if (comment.user.login !== process.env.AGENT_USERNAME) {
       console.log(`🔄 Potential clarification response on issue #${issue.number} - checking`);
-      await this.billy.checkAndHandleAssignedIssuesWithVM();
+      await this.billy.checkAndHandleAssignedIssues();
     }
   }
 
@@ -219,4 +219,18 @@ export class WebhookServer {
 if (require.main === module) {
   const webhookServer = new WebhookServer();
   webhookServer.start();
+  
+  // Also start polling every 60 seconds as backup
+  console.log('🔄 Starting polling backup (every 60 seconds)...');
+  setInterval(async () => {
+    try {
+      console.log(`⏰ ${new Date().toISOString()} - Polling for issues...`);
+      await webhookServer.billy.checkAndHandleAssignedIssues();
+    } catch (error) {
+      console.error('❌ Polling error:', error);
+    }
+  }, 60000);
+  
+  // Run initial check
+  webhookServer.billy.checkAndHandleAssignedIssues().catch(console.error);
 }

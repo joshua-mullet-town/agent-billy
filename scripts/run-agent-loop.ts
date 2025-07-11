@@ -66,7 +66,9 @@ program
     console.log(`👤 Assignee: ${options.assignee}`);
     console.log(`⏰ Interval: ${options.interval}s`);
     console.log(`🔄 Mode: ${options.dryRun ? 'DRY RUN' : 'LIVE'}`);
-    console.log('\\n' + '='.repeat(50));
+    console.log(`🔑 GitHub App: ${process.env.GITHUB_APP_ID ? 'Configured' : 'Not configured'}`);
+    console.log(`📁 Working Directory: ${process.cwd()}`);
+    console.log('\n' + '='.repeat(50));
 
     const billy = new AgentBilly({
       githubToken: options.token || process.env.GITHUB_TOKEN,

@@ -12,6 +12,7 @@
     "billy:status": "ts-node scripts/run-agent.ts status",
     "billy:watch": "ts-node scripts/run-agent-loop.ts watch",
     "billy:serve": "ts-node server/webhookServer.ts",
+    "billy:stateless": "ts-node server/statelessWebhook.ts",
     "billy:enhanced": "ts-node scripts/run-enhanced-agent.ts",
     "billy:watch-enhanced": "ts-node scripts/run-enhanced-agent.ts watch-enhanced",
     "billy:status-enhanced": "ts-node scripts/run-enhanced-agent.ts status-enhanced",

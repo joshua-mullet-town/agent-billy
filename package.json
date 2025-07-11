@@ -11,7 +11,7 @@
     "billy:check": "ts-node scripts/run-agent.ts check-issues",
     "billy:status": "ts-node scripts/run-agent.ts status",
     "billy:watch": "ts-node scripts/run-agent-loop.ts watch",
-    "billy:serve": "ts-node scripts/run-agent-loop.ts serve",
+    "billy:serve": "ts-node server/webhookServer.ts",
     "billy:enhanced": "ts-node scripts/run-enhanced-agent.ts",
     "billy:watch-enhanced": "ts-node scripts/run-enhanced-agent.ts watch-enhanced",
     "billy:status-enhanced": "ts-node scripts/run-enhanced-agent.ts status-enhanced",
@@ -32,6 +32,7 @@
   "author": "Joshua Mullet",
   "license": "MIT",
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.0",
     "@types/node": "^20.0.0",
     "ts-node": "^10.9.0",
     "typescript": "^5.0.0"
@@ -39,6 +40,7 @@
   "dependencies": {
     "axios": "^1.6.0",
     "commander": "^11.0.0",
-    "dotenv": "^17.0.0"
+    "dotenv": "^17.0.0",
+    "jsonwebtoken": "^9.0.0"
   }
 }

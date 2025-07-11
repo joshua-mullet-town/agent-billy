@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { GitHubAppAuth, GitHubAppConfig } from '../auth/githubApp';
 
 export interface CommentPayload {
   body: string;
@@ -11,23 +12,50 @@ export interface CommentResponse {
 }
 
 export class GitHubActions {
-  private token: string;
+  private token?: string;
+  private githubApp?: GitHubAppAuth;
   private baseURL = 'https://api.github.com';
 
-  constructor(token?: string) {
-    this.token = token || process.env.GITHUB_TOKEN || '';
-    if (!this.token || this.token === 'placeholder') {
-      console.warn('⚠️  No valid GitHub token provided. Actions will be disabled.');
+  constructor(token?: string, githubAppConfig?: GitHubAppConfig) {
+    this.token = token || process.env.GITHUB_TOKEN;
+    
+    // Initialize GitHub App if config provided
+    if (githubAppConfig) {
+      this.githubApp = new GitHubAppAuth(githubAppConfig);
+    } else if (process.env.GITHUB_APP_ID && process.env.GITHUB_APP_PRIVATE_KEY) {
+      this.githubApp = new GitHubAppAuth({
+        appId: process.env.GITHUB_APP_ID,
+        privateKey: process.env.GITHUB_APP_PRIVATE_KEY,
+        installationId: process.env.GITHUB_APP_INSTALLATION_ID
+      });
+    }
+
+    if (!this.token && !this.githubApp) {
+      console.warn('⚠️  No GitHub authentication provided. Actions will be disabled.');
     }
   }
 
-  private get headers() {
-    return {
-      'Authorization': `token ${this.token}`,
-      'Accept': 'application/vnd.github.v3+json',
-      'User-Agent': 'Agent-Billy/1.0',
-      'Content-Type': 'application/json'
-    };
+  private async getHeaders(owner?: string, repo?: string): Promise<Record<string, string>> {
+    // Prefer GitHub App authentication if available
+    if (this.githubApp && owner && repo) {
+      const headers = await this.githubApp.getAuthHeaders(owner, repo);
+      return {
+        ...headers,
+        'Content-Type': 'application/json'
+      };
+    }
+    
+    // Fallback to personal token
+    if (this.token) {
+      return {
+        'Authorization': `token ${this.token}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'Agent-Billy/1.0',
+        'Content-Type': 'application/json'
+      };
+    }
+
+    throw new Error('No GitHub authentication available');
   }
 
   // Billy's primary action: comment on issues
@@ -41,7 +69,7 @@ export class GitHubActions {
       const response = await axios.post(
         `${this.baseURL}/repos/${owner}/${repo}/issues/${issueNumber}/comments`,
         { body: comment },
-        { headers: this.headers }
+        { headers: await this.getHeaders(owner, repo) }
       );
       
       console.log(`✅ Billy commented on issue #${issueNumber}`);
@@ -67,7 +95,7 @@ export class GitHubActions {
       await axios.put(
         `${this.baseURL}/repos/${owner}/${repo}/issues/${issueNumber}/labels`,
         { labels },
-        { headers: this.headers }
+        { headers: await this.getHeaders(owner, repo) }
       );
       
       console.log(`✅ Billy updated labels on issue #${issueNumber}`);
@@ -89,7 +117,7 @@ export class GitHubActions {
       await axios.post(
         `${this.baseURL}/repos/${owner}/${repo}/issues/${issueNumber}/assignees`,
         { assignees },
-        { headers: this.headers }
+        { headers: await this.getHeaders(owner, repo) }
       );
       
       console.log(`✅ Billy assigned issue #${issueNumber} to: ${assignees.join(', ')}`);
@@ -113,7 +141,7 @@ export class GitHubActions {
       await axios.delete(
         `${this.baseURL}/repos/${owner}/${repo}/issues/${issueNumber}/assignees`,
         { 
-          headers: this.headers,
+          headers: await this.getHeaders(owner, repo),
           data: { assignees: [fromUser] }
         }
       );
@@ -137,7 +165,7 @@ export class GitHubActions {
       await axios.post(
         `${this.baseURL}/repos/${owner}/${repo}/issues/${issueNumber}/labels`,
         { labels: [label] },
-        { headers: this.headers }
+        { headers: await this.getHeaders(owner, repo) }
       );
       
       console.log(`✅ Billy added label "${label}" to issue #${issueNumber}`);
@@ -158,7 +186,7 @@ export class GitHubActions {
     try {
       await axios.delete(
         `${this.baseURL}/repos/${owner}/${repo}/issues/${issueNumber}/labels/${encodeURIComponent(label)}`,
-        { headers: this.headers }
+        { headers: await this.getHeaders(owner, repo) }
       );
       
       console.log(`✅ Billy removed label "${label}" from issue #${issueNumber}`);
@@ -187,7 +215,7 @@ export class GitHubActions {
           labels: labels || [],
           assignees: assignees || []
         },
-        { headers: this.headers }
+        { headers: await this.getHeaders(owner, repo) }
       );
       
       console.log(`✅ Billy created issue #${response.data.number}`);

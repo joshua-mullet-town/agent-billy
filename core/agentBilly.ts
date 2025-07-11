@@ -3,9 +3,11 @@ import { GitHubActions } from '../actions/githubActions';
 import { AgentMemory, TaskMemory, ProcessedIssue } from '../memory/agentMemory';
 import { callLLM } from '../cognition/llmWrapper';
 import { PromptLoader } from '../cognition/promptLoader';
+import { GitHubAppConfig } from '../auth/githubApp';
 
 export interface AgentConfig {
   githubToken?: string;
+  githubAppConfig?: GitHubAppConfig;
   defaultOwner?: string;
   defaultRepo?: string;
   assigneeUsername?: string;
@@ -25,8 +27,16 @@ export class AgentBilly {
       ...config
     };
 
-    this.sensor = new GitHubSensor(config.githubToken);
-    this.actions = new GitHubActions(config.githubToken);
+    // Check for GitHub App config from environment if not provided
+    const githubAppConfig = config.githubAppConfig || 
+      (process.env.GITHUB_APP_ID && process.env.GITHUB_APP_PRIVATE_KEY ? {
+        appId: process.env.GITHUB_APP_ID,
+        privateKey: process.env.GITHUB_APP_PRIVATE_KEY,
+        installationId: process.env.GITHUB_APP_INSTALLATION_ID
+      } : undefined);
+
+    this.sensor = new GitHubSensor(config.githubToken, githubAppConfig);
+    this.actions = new GitHubActions(config.githubToken, githubAppConfig);
     this.memory = new AgentMemory();
   }
 
@@ -38,27 +48,27 @@ export class AgentBilly {
     }
 
     const repoFullName = `${this.config.defaultOwner}/${this.config.defaultRepo}`;
-    
+
     try {
       // Record that Billy is starting a cycle
       await this.memory.recordCycle();
-      
-      // Perception: What issues are assigned to me?
-      const assignedIssues = await this.sensor.getAssignedIssues(
+
+      // Perception: What issues are labeled for me?
+      const labeledIssues = await this.sensor.getLabeledIssues(
         this.config.defaultOwner,
         this.config.defaultRepo,
-        this.config.assigneeUsername!
+        'for-billy'
       );
 
-      if (assignedIssues.length === 0) {
-        console.log('😌 No assigned issues found. Billy is taking a well-deserved break.');
+      if (labeledIssues.length === 0) {
+        console.log('😌 No issues labeled for Billy. Billy is taking a well-deserved break.');
         return;
       }
 
       let processedCount = 0;
       let skippedCount = 0;
 
-      for (const issue of assignedIssues) {
+      for (const issue of labeledIssues) {
         const wasProcessed = await this.handleSingleIssue(issue);
         if (wasProcessed) {
           processedCount++;
@@ -81,7 +91,7 @@ export class AgentBilly {
   // Billy's process for handling a single issue
   private async handleSingleIssue(issue: GitHubIssue): Promise<boolean> {
     const repoFullName = `${this.config.defaultOwner}/${this.config.defaultRepo}`;
-    
+
     // Memory: Have I already processed this issue?
     if (await this.memory.hasProcessedIssue(issue.number, repoFullName)) {
       console.log(`🧠 Issue #${issue.number} already processed, skipping`);
@@ -130,7 +140,7 @@ export class AgentBilly {
       if (clarificationCheck.needsClarification) {
         // Billy needs clarification - post questions and set up workflow
         console.log(`❓ Billy needs clarification for issue #${issue.number}`);
-        
+
         const clarificationComment = `Hi @${issue.user.login}! 👋
 
 I need some clarification before I can proceed with this issue.
@@ -149,10 +159,10 @@ Agent Billy 🤖`;
           console.log('─'.repeat(50));
           console.log(`🔄 [DRY RUN] Billy would add label "needs-human"`);
           console.log(`🔄 [DRY RUN] Billy would reassign from ${this.config.assigneeUsername} to ${issue.user.login}`);
-          
+
           await this.memory.markIssueProcessed(
-            issue.number, 
-            repoFullName, 
+            issue.number,
+            repoFullName,
             'awaiting_clarification',
             undefined,
             undefined,
@@ -171,7 +181,14 @@ Agent Billy 🤖`;
           );
 
           if (comment) {
-            // Add needs-human label
+            // Remove 'for-billy' label and add 'needs-human' label
+            await this.actions.removeLabel(
+              this.config.defaultOwner!,
+              this.config.defaultRepo!,
+              issue.number,
+              'for-billy'
+            );
+
             await this.actions.addLabel(
               this.config.defaultOwner!,
               this.config.defaultRepo!,
@@ -179,19 +196,10 @@ Agent Billy 🤖`;
               'needs-human'
             );
 
-            // Reassign to original assignee
-            await this.actions.reassignIssue(
-              this.config.defaultOwner!,
-              this.config.defaultRepo!,
-              issue.number,
-              this.config.assigneeUsername!,
-              issue.user.login
-            );
-
             // Track in memory
             await this.memory.markIssueProcessed(
-              issue.number, 
-              repoFullName, 
+              issue.number,
+              repoFullName,
               'awaiting_clarification',
               comment.id,
               comment.html_url,
@@ -223,7 +231,7 @@ Agent Billy 🤖`;
             console.log('─'.repeat(50));
             console.log(response);
             console.log('─'.repeat(50));
-            
+
             // Mark as processed in dry run mode too
             await this.memory.markIssueProcessed(issue.number, repoFullName, 'responded');
           } else {
@@ -235,20 +243,28 @@ Agent Billy 🤖`;
             );
 
             if (comment) {
+              // Remove 'for-billy' label after responding
+              await this.actions.removeLabel(
+                this.config.defaultOwner!,
+                this.config.defaultRepo!,
+                issue.number,
+                'for-billy'
+              );
+
               await this.memory.logTaskAction(taskId, 'comment_posted', {
                 commentId: comment.id,
                 commentUrl: comment.html_url
               });
-              
+
               // Mark as processed with comment details
               await this.memory.markIssueProcessed(
-                issue.number, 
-                repoFullName, 
+                issue.number,
+                repoFullName,
                 'responded',
                 comment.id,
                 comment.html_url
               );
-              
+
               console.log(`✅ Billy commented on issue #${issue.number}: ${comment.html_url}`);
             } else {
               await this.memory.markIssueProcessed(issue.number, repoFullName, 'skipped');
@@ -277,7 +293,8 @@ Agent Billy 🤖`;
     questions?: string;
   }> {
     try {
-      const prompt = await PromptLoader.loadPrompt('clarificationCheck', {
+      // Use GiveGrove-specific clarification prompt
+      const prompt = await PromptLoader.loadPrompt('clarificationCheckGiveGrove', {
         issueTitle: issue.title,
         issueBody: issue.body || 'No description provided',
         issueNumber: issue.number.toString(),
@@ -295,19 +312,47 @@ Agent Billy 🤖`;
       });
 
       const content = response.content.trim();
-      
+
       if (content.includes('✅ Ready to proceed.')) {
         return { needsClarification: false };
       } else if (content.includes('❓ Need clarification on:')) {
-        const questions = content.replace('❓ Need clarification on:', '').trim();
-        return { 
-          needsClarification: true, 
+        let questions = content.replace('❓ Need clarification on:', '').trim();
+        
+        // Extract only numbered questions, remove verbose context paragraphs
+        const lines = questions.split('\n');
+        const questionLines: string[] = [];
+        for (const line of lines) {
+          // Include numbered questions and their continuations
+          if (line.match(/^\d+\./) || (questionLines.length > 0 && line.startsWith('   '))) {
+            questionLines.push(line);
+          } else if (line.trim() === '') {
+            // Keep blank lines between questions
+            if (questionLines.length > 0) {
+              questionLines.push(line);
+            }
+          } else {
+            // Stop at first non-question paragraph
+            break;
+          }
+        }
+        
+        questions = questionLines.join('\n').trim();
+        
+        return {
+          needsClarification: true,
           questions: questions
+        };
+      } else if (content.includes('🛑 Reconsider this')) {
+        // Issue needs reconsideration - treat as needing clarification
+        const reconsiderText = content.replace('🛑 Reconsider this issue for these reasons:', '').trim();
+        return {
+          needsClarification: true,
+          questions: `I believe this issue may need reconsideration:\n\n${reconsiderText}`
         };
       } else {
         // Default to needing clarification if response is unclear
-        return { 
-          needsClarification: true, 
+        return {
+          needsClarification: true,
           questions: content
         };
       }
@@ -381,7 +426,7 @@ Agent Billy 🤖`;
 
     const repoFullName = `${this.config.defaultOwner}/${this.config.defaultRepo}`;
     const awaitingClarification = await this.memory.getIssuesAwaitingClarification(repoFullName);
-    
+
     if (awaitingClarification.length === 0) {
       return 0;
     }
@@ -412,7 +457,7 @@ Agent Billy 🤖`;
         );
 
         const clarificationRequestTime = new Date(processedIssue.clarificationRequest?.requestedAt || processedIssue.processedAt);
-        const newComments = comments.filter(comment => 
+        const newComments = comments.filter(comment =>
           new Date(comment.created_at) > clarificationRequestTime &&
           comment.user.login !== this.config.assigneeUsername // Ignore Billy's own comments
         );
@@ -431,12 +476,12 @@ Agent Billy 🤖`;
         );
 
         if (analysisResult.questionsAnswered) {
-          // Questions answered - remove label and reassign to Billy
-          console.log(`✅ Clarification received for issue #${processedIssue.issueNumber}`);
+          // Questions fully answered - remove label and reassign to Billy
+          console.log(`✅ Clarification complete for issue #${processedIssue.issueNumber}`);
 
           if (this.config.dryRun) {
             console.log(`🔄 [DRY RUN] Billy would remove "needs-human" label`);
-            console.log(`🔄 [DRY RUN] Billy would reassign to ${this.config.assigneeUsername}`);
+            console.log(`🔄 [DRY RUN] Billy would add "for-billy" label`);
             console.log(`🔄 [DRY RUN] Billy would post acknowledgment comment`);
           } else {
             // Remove needs-human label
@@ -447,13 +492,12 @@ Agent Billy 🤖`;
               'needs-human'
             );
 
-            // Reassign to Billy
-            await this.actions.reassignIssue(
+            // Add for-billy label back
+            await this.actions.addLabel(
               this.config.defaultOwner,
               this.config.defaultRepo,
               processedIssue.issueNumber,
-              issue.assignee?.login || issue.user.login,
-              this.config.assigneeUsername!
+              'for-billy'
             );
 
             // Post acknowledgment comment
@@ -485,10 +529,67 @@ Agent Billy 🤖`;
           }
 
           processedCount++;
+        } else if (analysisResult.needsFollowUp && analysisResult.followUpQuestions) {
+          // Need follow-up clarification round
+          console.log(`🔄 Issue #${processedIssue.issueNumber} needs follow-up clarification`);
+
+          const followUpComment = `Thanks for the response! I have a few follow-up questions to ensure I implement this perfectly:
+
+${analysisResult.followUpQuestions}
+
+These details will help me provide the best implementation for your GiveGrove fundraising platform.
+
+Agent Billy 🤖`;
+
+          if (this.config.dryRun) {
+            console.log(`🔄 [DRY RUN] Billy would post follow-up questions on issue #${processedIssue.issueNumber}:`);
+            console.log('─'.repeat(50));
+            console.log(followUpComment);
+            console.log('─'.repeat(50));
+          } else {
+            // Post follow-up questions
+            await this.actions.commentOnIssue(
+              this.config.defaultOwner,
+              this.config.defaultRepo,
+              processedIssue.issueNumber,
+              followUpComment
+            );
+          }
+
+          // Keep status as awaiting_clarification
+          console.log(`💬 Follow-up questions posted for issue #${processedIssue.issueNumber}`);
+        } else if (analysisResult.needsClarification && analysisResult.clarificationRequest) {
+          // Previous response was unclear
+          console.log(`🔄 Issue #${processedIssue.issueNumber} needs clarification of previous response`);
+
+          const clarifyComment = `I want to make sure I understand your requirements correctly:
+
+${analysisResult.clarificationRequest}
+
+Please help me clarify so I can implement exactly what you need for your fundraising platform.
+
+Agent Billy 🤖`;
+
+          if (this.config.dryRun) {
+            console.log(`🔄 [DRY RUN] Billy would ask for clarification on issue #${processedIssue.issueNumber}:`);
+            console.log('─'.repeat(50));
+            console.log(clarifyComment);
+            console.log('─'.repeat(50));
+          } else {
+            // Ask for clarification
+            await this.actions.commentOnIssue(
+              this.config.defaultOwner,
+              this.config.defaultRepo,
+              processedIssue.issueNumber,
+              clarifyComment
+            );
+          }
+
+          console.log(`❓ Clarification request posted for issue #${processedIssue.issueNumber}`);
         } else {
-          // Questions not fully answered - keep waiting or ask follow-up
+          // Questions not fully answered - keep waiting
           console.log(`❓ Issue #${processedIssue.issueNumber} clarification incomplete, continuing to wait`);
-          
+
           // Update last checked timestamp
           await this.memory.markIssueProcessed(
             processedIssue.issueNumber,
@@ -512,13 +613,18 @@ Agent Billy 🤖`;
   ): Promise<{
     questionsAnswered: boolean;
     summary?: string;
+    needsFollowUp?: boolean;
+    followUpQuestions?: string;
+    needsClarification?: boolean;
+    clarificationRequest?: string;
   }> {
     try {
-      const prompt = await PromptLoader.loadPrompt('commentAnalysis', {
+      // Use GiveGrove-specific clarification analysis prompt
+      const prompt = await PromptLoader.loadPrompt('clarificationAnalysisGiveGrove', {
         issueNumber: processedIssue.issueNumber.toString(),
         issueTitle: 'Issue Analysis',
         previousQuestions: processedIssue.clarificationRequest?.questions || 'No questions recorded',
-        recentComments: newComments.map(c => 
+        recentComments: newComments.map(c =>
           `**${c.user.login}** (${c.created_at}):\n${c.body}`
         ).join('\n\n---\n\n')
       });
@@ -532,12 +638,29 @@ Agent Billy 🤖`;
       });
 
       const content = response.content.trim();
-      
-      if (content.includes('✅ Clarification received.')) {
-        const summaryMatch = content.match(/Summary of answers:(.*?)(?:Ready to proceed|$)/s);
+
+      if (content.includes('✅ Clarification complete.')) {
+        // Fully answered - ready to proceed
+        const summaryMatch = content.match(/Summary of requirements:(.*?)(?:Ready to proceed|$)/s);
         return {
           questionsAnswered: true,
           summary: summaryMatch ? summaryMatch[1].trim() : 'Questions have been answered.'
+        };
+      } else if (content.includes('❓ Need follow-up clarification on:')) {
+        // Need additional clarification round
+        const followUpMatch = content.match(/❓ Need follow-up clarification on:(.*?)(?:Context:|$)/s);
+        return {
+          questionsAnswered: false,
+          needsFollowUp: true,
+          followUpQuestions: followUpMatch ? followUpMatch[1].trim() : 'Additional clarification needed.'
+        };
+      } else if (content.includes('🔄 Please clarify your previous response:')) {
+        // Previous response was unclear
+        const clarifyMatch = content.match(/🔄 Please clarify your previous response:(.*?)(?:Context:|$)/s);
+        return {
+          questionsAnswered: false,
+          needsClarification: true,
+          clarificationRequest: clarifyMatch ? clarifyMatch[1].trim() : 'Please clarify your previous response.'
         };
       } else {
         return { questionsAnswered: false };

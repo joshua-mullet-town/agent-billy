@@ -1,0 +1,58 @@
+{
+  "platform": "GiveGrove - Fundraising Platform",
+  "lastUpdated": "2025-01-09",
+  "architecture": {
+    "frontend": {
+      "framework": "React with TypeScript",
+      "stateManagement": "React Context API",
+      "styling": "Tailwind CSS",
+      "routing": "React Router v6",
+      "keyLibraries": ["Firebase", "Stripe", "React Hook Form"]
+    },
+    "backend": {
+      "framework": "Node.js with Express",
+      "database": "Firebase Firestore",
+      "authentication": "Firebase Auth",
+      "payments": "Stripe API",
+      "hosting": "Google Cloud Functions"
+    }
+  },
+  "coreFeatures": {
+    "auctions": {
+      "components": ["AuctionList", "AuctionCard", "BidDialog", "AuctionTimer"],
+      "endpoints": ["/api/auctions", "/api/bids", "/api/auction/:id/bid"],
+      "firestoreCollections": ["auctions", "bids", "auction_winners"],
+      "realTimeFeatures": "Firebase listeners for live bid updates"
+    },
+    "payments": {
+      "components": ["PaymentForm", "CheckoutModal", "PaymentHistory"],
+      "stripeIntegration": "Checkout sessions for auction winners",
+      "supportedMethods": ["Credit Card", "ACH Bank Transfer"]
+    },
+    "users": {
+      "authentication": "Firebase Auth with email/password and Google OAuth",
+      "roles": ["donor", "organizer", "admin"],
+      "profile": "Stored in Firestore users collection"
+    },
+    "campaigns": {
+      "components": ["CampaignDashboard", "DonationForm", "CampaignProgress"],
+      "types": ["auction", "direct_donation", "recurring"]
+    }
+  },
+  "mobileConsiderations": {
+    "responsive": "All components use Tailwind responsive classes",
+    "touchTargets": "Minimum 44px for interactive elements",
+    "criticalPaths": ["Bidding must work on mobile", "Payment forms mobile-optimized"]
+  },
+  "commonPatterns": {
+    "errorHandling": "Toast notifications via react-hot-toast",
+    "loading": "Skeleton screens for data fetching",
+    "formValidation": "React Hook Form with Zod schemas",
+    "apiCalls": "Axios with interceptors for auth tokens"
+  },
+  "securityConsiderations": {
+    "authentication": "All API routes require Firebase auth token",
+    "paymentData": "Never stored locally, only Stripe tokens",
+    "permissions": "Row-level security in Firestore rules"
+  }
+}

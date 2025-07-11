@@ -3,6 +3,7 @@ import { VMOrchestrator, VMInstance, Task, TaskResult } from './vmOrchestrator';
 import { ClaudeCodeClient } from './claudeCodeClient';
 import { GitHubIssue } from '../perception/githubSensor';
 import { AgentMemory } from '../memory/agentMemory';
+import { GitHubAppConfig } from '../auth/githubApp';
 
 export interface EnhancedAgentConfig extends AgentConfig {
   digitalOceanToken?: string;

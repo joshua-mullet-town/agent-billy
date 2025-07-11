@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { GitHubAppAuth, GitHubAppConfig } from '../auth/githubApp';
 
 export interface GitHubIssue {
   id: number;
@@ -24,31 +25,92 @@ export interface GitHubComment {
 }
 
 export class GitHubSensor {
-  private token: string;
+  private token?: string;
+  private githubApp?: GitHubAppAuth;
   private baseURL = 'https://api.github.com';
 
-  constructor(token?: string) {
-    this.token = token || process.env.GITHUB_TOKEN || '';
-    if (!this.token) {
-      console.warn('⚠️  No GitHub token provided. Some operations may fail.');
+  constructor(token?: string, githubAppConfig?: GitHubAppConfig) {
+    this.token = token || process.env.GITHUB_TOKEN;
+    
+    // Initialize GitHub App if config provided
+    if (githubAppConfig) {
+      this.githubApp = new GitHubAppAuth(githubAppConfig);
+    } else if (process.env.GITHUB_APP_ID && process.env.GITHUB_APP_PRIVATE_KEY) {
+      this.githubApp = new GitHubAppAuth({
+        appId: process.env.GITHUB_APP_ID,
+        privateKey: process.env.GITHUB_APP_PRIVATE_KEY,
+        installationId: process.env.GITHUB_APP_INSTALLATION_ID
+      });
+    }
+
+    if (!this.token && !this.githubApp) {
+      console.warn('⚠️  No GitHub authentication provided. Some operations may fail.');
     }
   }
 
-  private get headers() {
-    return {
-      'Authorization': `token ${this.token}`,
-      'Accept': 'application/vnd.github.v3+json',
-      'User-Agent': 'Agent-Billy/1.0'
-    };
+  private async getHeaders(owner?: string, repo?: string): Promise<Record<string, string>> {
+    // Prefer GitHub App authentication if available
+    if (this.githubApp && owner && repo) {
+      return await this.githubApp.getAuthHeaders(owner, repo);
+    }
+    
+    // Fallback to personal token
+    if (this.token) {
+      return {
+        'Authorization': `token ${this.token}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'Agent-Billy/1.0'
+      };
+    }
+
+    throw new Error('No GitHub authentication available');
   }
 
-  // Billy's primary sense: what issues are assigned to him?
+  // Billy's new primary sense: what issues are labeled for him?
+  async getLabeledIssues(owner: string, repo: string, label: string = 'for-billy'): Promise<GitHubIssue[]> {
+    try {
+      const response = await axios.get(
+        `${this.baseURL}/repos/${owner}/${repo}/issues`,
+        {
+          headers: await this.getHeaders(owner, repo),
+          params: {
+            labels: label,
+            state: 'open',
+            sort: 'updated',
+            direction: 'desc',
+            per_page: 100
+          }
+        }
+      );
+      
+      // Filter out pull requests (GitHub API returns both issues and PRs)
+      const issues = response.data.filter((item: any) => !item.pull_request);
+      
+      console.log(`👀 Found ${issues.length} issue(s) labeled '${label}' in ${owner}/${repo}`);
+      return issues;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 404) {
+          console.error(`❌ Repository ${owner}/${repo} not found or not accessible`);
+        } else if (error.response?.status === 403) {
+          console.error(`❌ GitHub API rate limit exceeded or insufficient permissions`);
+        } else {
+          console.error(`❌ GitHub API error (${error.response?.status}):`, error.response?.data?.message || error.message);
+        }
+      } else {
+        console.error('❌ Failed to fetch labeled issues:', error instanceof Error ? error.message : String(error));
+      }
+      return [];
+    }
+  }
+
+  // Billy's legacy sense: what issues are assigned to him? (kept for backward compatibility)
   async getAssignedIssues(owner: string, repo: string, assignee: string = 'agent-billy'): Promise<GitHubIssue[]> {
     try {
       const response = await axios.get(
         `${this.baseURL}/repos/${owner}/${repo}/issues`,
         {
-          headers: this.headers,
+          headers: await this.getHeaders(owner, repo),
           params: {
             assignee,
             state: 'open',
@@ -86,7 +148,7 @@ export class GitHubSensor {
       const response = await axios.get(
         `${this.baseURL}/repos/${owner}/${repo}/issues/${issueNumber}/comments`,
         {
-          headers: this.headers,
+          headers: await this.getHeaders(owner, repo),
           params: {
             per_page: 100,
             sort: 'created',
@@ -118,7 +180,7 @@ export class GitHubSensor {
       const response = await axios.get(
         `${this.baseURL}/repos/${owner}/${repo}/issues/${issueNumber}`,
         {
-          headers: this.headers
+          headers: await this.getHeaders(owner, repo)
         }
       );
       
@@ -146,7 +208,7 @@ export class GitHubSensor {
       const response = await axios.get(
         `${this.baseURL}/user/repos`,
         {
-          headers: this.headers,
+          headers: await this.getHeaders(),
           params: {
             sort: 'updated',
             per_page: 100

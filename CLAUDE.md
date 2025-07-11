@@ -125,3 +125,11 @@ The architecture is designed to evolve from:
 - Script-like → Conversational interface
 
 The mental model remains consistent: Billy is a teammate who senses, thinks, acts, and remembers.
+
+## Working Cadence for Development
+
+When helping build Agent Billy, follow this structure for each task:
+1. **What We're Doing** - High-level overview of the task
+2. **Why** - The purpose and expected outcome
+3. **Your Part** - Explicit step-by-step instructions for what the user needs to do
+4. **What I'll Do** - Clear description of what Claude will handle

@@ -1,19 +1,15 @@
 import * as http from 'http';
 import * as crypto from 'crypto';
 import { AgentBilly } from '../core/agentBilly';
-import { EnhancedAgentBilly } from '../core/enhancedAgentBilly';
 
 const port = process.env.PORT || 3000;
 const webhookSecret = process.env.GITHUB_WEBHOOK_SECRET || '';
 
 export class WebhookServer {
-  private billy: EnhancedAgentBilly;
+  private billy: AgentBilly;
 
   constructor() {
-    this.billy = new EnhancedAgentBilly({
-      githubToken: process.env.GITHUB_TOKEN,
-      digitalOceanToken: process.env.DIGITAL_OCEAN_TOKEN,
-      claudeApiKey: process.env.CLAUDE_API_KEY,
+    this.billy = new AgentBilly({
       defaultOwner: process.env.DEFAULT_GITHUB_OWNER,
       defaultRepo: process.env.DEFAULT_GITHUB_REPO,
       assigneeUsername: process.env.AGENT_USERNAME || 'agent-billy'

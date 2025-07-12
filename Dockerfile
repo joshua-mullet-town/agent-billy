@@ -6,8 +6,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
-# Copy source code
+# Copy source code (force cache bust)
 COPY . .
+RUN ls -la server/
 
 # Build TypeScript
 RUN npm run build

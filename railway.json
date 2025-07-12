@@ -4,6 +4,9 @@
     "builder": "DOCKERFILE",
     "dockerfilePath": "Dockerfile"
   },
+  "deploy": {
+    "startCommand": "npm run billy:stateless"
+  },
   "environments": {
     "production": {
       "variables": {

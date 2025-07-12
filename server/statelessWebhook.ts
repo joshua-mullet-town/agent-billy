@@ -59,14 +59,14 @@ export class StatelessWebhookServer {
 
   // Handle issue events (opened, labeled, etc.)
   private async handleIssueEvent(payload: any): Promise<void> {
-    const { action, issue } = payload;
+    const { action, issue, repository } = payload;
     
     console.log(`📋 Issue #${issue.number} ${action}`);
 
     // Only process when 'for-billy' label is added
     if (action === 'labeled' && payload.label?.name === 'for-billy') {
       console.log(`🏷️  Issue #${issue.number} labeled for Billy - processing`);
-      await this.processIssue(issue);
+      await this.processIssue(issue, repository);
     }
   }
 
@@ -90,12 +90,12 @@ export class StatelessWebhookServer {
   }
 
   // Process an issue labeled for Billy
-  private async processIssue(issue: any): Promise<void> {
-    const owner = issue.repository.owner.login;
-    const repo = issue.repository.name;
+  private async processIssue(issue: any, repository: any): Promise<void> {
+    const owner = repository.owner.login;
+    const repo = repository.name;
 
     // Check if Billy already commented
-    const existingComment = await this.findBillyComment(issue);
+    const existingComment = await this.findBillyComment(issue, repository);
     if (existingComment) {
       console.log(`✅ Billy already processed issue #${issue.number}`);
       return;
@@ -141,9 +141,9 @@ Agent Billy 🤖`
   }
 
   // Find Billy's comment on an issue
-  private async findBillyComment(issue: any): Promise<any> {
-    const owner = issue.repository.owner.login;
-    const repo = issue.repository.name;
+  private async findBillyComment(issue: any, repository: any): Promise<any> {
+    const owner = repository.owner.login;
+    const repo = repository.name;
     
     const comments = await this.sensor.getIssueComments(owner, repo, issue.number);
     return comments.find(c => 

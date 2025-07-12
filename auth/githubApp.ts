@@ -16,7 +16,9 @@ export class GitHubAppAuth {
 
   constructor(config: GitHubAppConfig) {
     this.appId = config.appId;
-    this.privateKey = config.privateKey;
+    
+    // Fix private key formatting - Railway env vars convert newlines to literal \n
+    this.privateKey = config.privateKey.replace(/\\n/g, '\n');
     this.installationId = config.installationId;
   }
 

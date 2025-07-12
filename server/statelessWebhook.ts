@@ -72,7 +72,7 @@ export class StatelessWebhookServer {
 
   // Handle issue comment events
   private async handleIssueCommentEvent(payload: any): Promise<void> {
-    const { action, issue, comment } = payload;
+    const { action, issue, comment, repository } = payload;
     
     if (action !== 'created') return;
 
@@ -81,7 +81,7 @@ export class StatelessWebhookServer {
     // Check if issue has 'needs-human' label and Billy previously commented
     if (issue.labels.some((l: any) => l.name === 'needs-human')) {
       // Check if Billy has commented before
-      const billyComment = await this.findBillyComment(issue);
+      const billyComment = await this.findBillyComment(issue, repository);
       if (billyComment && comment.user.login !== 'agent-billy' && comment.user.login !== 'agent-billy[bot]') {
         console.log(`🔄 Potential clarification response on issue #${issue.number}`);
         await this.processClarificationResponse(issue, billyComment, comment);

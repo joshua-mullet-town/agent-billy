@@ -38,6 +38,9 @@ You are Agent Billy, a development teammate working on the GiveGrove fundraising
 
 **Author:** {author}
 
+**Previous Comments:**
+{comments}
+
 ## Your Task
 
 Carefully analyze this issue in the context of the GiveGrove platform and determine whether you have enough information to proceed with implementation.

@@ -45,10 +45,6 @@ export class StatelessWebhookServer {
           await this.handleIssueEvent(payload);
           break;
 
-        case 'issue_comment':
-          await this.handleIssueCommentEvent(payload);
-          break;
-
         default:
           console.log(`📝 Ignoring webhook event: ${event}`);
       }
@@ -70,39 +66,14 @@ export class StatelessWebhookServer {
     }
   }
 
-  // Handle issue comment events
-  private async handleIssueCommentEvent(payload: any): Promise<void> {
-    const { action, issue, comment, repository } = payload;
-    
-    if (action !== 'created') return;
-
-    console.log(`💬 New comment on issue #${issue.number} by ${comment.user.login}`);
-
-    // Check if issue has 'needs-human' label and Billy previously commented
-    if (issue.labels.some((l: any) => l.name === 'needs-human')) {
-      // Check if Billy has commented before
-      const billyComment = await this.findBillyComment(issue, repository);
-      if (billyComment && comment.user.login !== 'agent-billy' && comment.user.login !== 'agent-billy[bot]') {
-        console.log(`🔄 Potential clarification response on issue #${issue.number}`);
-        await this.processClarificationResponse(issue, billyComment, comment);
-      }
-    }
-  }
 
   // Process an issue labeled for Billy
   private async processIssue(issue: any, repository: any): Promise<void> {
     const owner = repository.owner.login;
     const repo = repository.name;
 
-    // Check if Billy already commented
-    const existingComment = await this.findBillyComment(issue, repository);
-    if (existingComment) {
-      console.log(`✅ Billy already processed issue #${issue.number}`);
-      return;
-    }
-
-    // Check if clarification is needed
-    const clarificationCheck = await this.checkIfClarificationNeeded(issue);
+    // Check if clarification is needed (with full context)
+    const clarificationCheck = await this.checkIfClarificationNeeded(issue, repository);
 
     if (clarificationCheck.needsClarification) {
       // Post clarification request
@@ -154,14 +125,21 @@ Agent Billy 🤖`
   }
 
   // Check if clarification is needed
-  private async checkIfClarificationNeeded(issue: any): Promise<{ needsClarification: boolean; questions?: string }> {
+  private async checkIfClarificationNeeded(issue: any, repository: any): Promise<{ needsClarification: boolean; questions?: string }> {
     try {
+      // Get all comments to provide full context
+      const comments = await this.sensor.getIssueComments(repository.owner.login, repository.name, issue.number);
+      const commentsContext = comments.length > 0 
+        ? comments.map((c: any, i: number) => `Comment ${i + 1} by ${c.user.login}: ${c.body}`).join('\n\n')
+        : 'No comments yet';
+
       const prompt = await PromptLoader.loadPrompt('clarificationCheckGiveGrove', {
         issueTitle: issue.title,
         issueBody: issue.body || 'No description provided',
         issueNumber: issue.number.toString(),
         labels: issue.labels.map((l: any) => l.name).join(', ') || 'No labels',
-        author: issue.user.login
+        author: issue.user.login,
+        comments: commentsContext
       });
 
       const response = await callLLM({
@@ -223,18 +201,6 @@ Agent Billy 🤖`
     }
   }
 
-  // Process clarification response
-  private async processClarificationResponse(issue: any, billyComment: any, userComment: any): Promise<void> {
-    // For now, just acknowledge the response
-    const owner = issue.repository.owner.login;
-    const repo = issue.repository.name;
-
-    // Simple check: if user responded, assume clarification provided
-    await this.actions.removeLabel(owner, repo, issue.number, 'needs-human');
-    await this.actions.addLabel(owner, repo, issue.number, 'for-billy');
-    
-    console.log(`✅ Clarification received for issue #${issue.number}, re-labeled for processing`);
-  }
 
   // Start the webhook server
   start(): void {

@@ -25,5 +25,5 @@ USER billy
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD node -e "console.log('Billy is alive')" || exit 1
 
-# Run Billy stateless webhook server
+# Run Billy stateless webhook server (no memory required)
 CMD ["npm", "run", "billy:stateless"]

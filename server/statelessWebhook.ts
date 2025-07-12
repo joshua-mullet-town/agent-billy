@@ -4,6 +4,7 @@ import { GitHubSensor } from '../perception/githubSensor';
 import { GitHubActions } from '../actions/githubActions';
 import { callLLM } from '../cognition/llmWrapper';
 import { PromptLoader } from '../cognition/promptLoader';
+import { ConfigReader, BillyConfig } from '../utils/configReader';
 
 const port = process.env.PORT || 3000;
 const webhookSecret = process.env.GITHUB_WEBHOOK_SECRET || '';
@@ -11,10 +12,12 @@ const webhookSecret = process.env.GITHUB_WEBHOOK_SECRET || '';
 export class StatelessWebhookServer {
   private sensor: GitHubSensor;
   private actions: GitHubActions;
+  private configReader: ConfigReader;
 
   constructor() {
     this.sensor = new GitHubSensor();
     this.actions = new GitHubActions();
+    this.configReader = new ConfigReader();
   }
 
   // Verify GitHub webhook signature
@@ -72,7 +75,12 @@ export class StatelessWebhookServer {
     const owner = repository.owner.login;
     const repo = repository.name;
 
-    // Check if clarification is needed (with full context)
+    console.log(`🤖 Billy processing issue #${issue.number} in ${owner}/${repo}`);
+
+    // Step 1: Read repository configuration
+    const config = await this.configReader.readRepositoryConfig(owner, repo);
+
+    // Step 2: Check if clarification is needed (with full context)
     const clarificationCheck = await this.checkIfClarificationNeeded(issue, repository);
 
     if (clarificationCheck.needsClarification) {
@@ -87,28 +95,155 @@ I need some clarification before I can proceed with this issue.
 
 ${clarificationCheck.questions}
 
-I've labeled this issue as \`needs-human\`. Once you provide the clarification, I'll be able to help with the implementation!
+Once you provide the clarification, I'll be able to help with the implementation!
 
-Thanks!
+Thanks!  
 Agent Billy 🤖`
       );
 
       if (comment) {
-        await this.actions.removeLabel(owner, repo, issue.number, 'for-billy');
-        await this.actions.addLabel(owner, repo, issue.number, 'needs-human');
+        await this.actions.addLabel(owner, repo, issue.number, 'needs-clarification');
         console.log(`❓ Billy requested clarification on issue #${issue.number}`);
       }
     } else {
-      // Process normally
-      const response = await this.processIssueWithLLM(issue);
-      if (response) {
-        const comment = await this.actions.commentOnIssue(owner, repo, issue.number, response);
-        if (comment) {
-          await this.actions.removeLabel(owner, repo, issue.number, 'for-billy');
-          console.log(`✅ Billy responded to issue #${issue.number}`);
-        }
+      // Step 3: Billy is ready to implement - execute configured workflow
+      console.log(`🚀 Billy is ready to implement issue #${issue.number}`);
+      await this.executeImplementationWorkflow(issue, repository, config);
+    }
+  }
+
+  // Execute the configured implementation workflow
+  private async executeImplementationWorkflow(issue: any, repository: any, config: BillyConfig | null): Promise<void> {
+    const owner = repository.owner.login;
+    const repo = repository.name;
+    const workflowType = config?.billy.workflow_type || 'simple_comment';
+
+    console.log(`🔧 Executing "${workflowType}" workflow for issue #${issue.number}`);
+
+    switch (workflowType) {
+      case 'github_actions':
+        await this.executeGitHubActionsWorkflow(issue, repository, config);
+        break;
+
+      case 'vm_development':
+        await this.executeVMDevelopmentWorkflow(issue, repository, config);
+        break;
+
+      case 'simple_comment':
+        await this.executeSimpleCommentWorkflow(issue, repository);
+        break;
+
+      case 'custom':
+        await this.executeCustomWorkflow(issue, repository, config);
+        break;
+
+      default:
+        console.error(`❌ Unknown workflow type: ${workflowType}`);
+        await this.actions.commentOnIssue(owner, repo, issue.number, 
+          `❌ **Configuration Error**\n\nUnknown workflow type: "${workflowType}"\n\nPlease check your \`.github/billy-config.yml\` file.`);
+    }
+  }
+
+  // Execute GitHub Actions workflow
+  private async executeGitHubActionsWorkflow(issue: any, repository: any, config: BillyConfig | null): Promise<void> {
+    const owner = repository.owner.login;
+    const repo = repository.name;
+
+    // Comment that Billy is ready to implement
+    await this.actions.commentOnIssue(owner, repo, issue.number, 
+      `🚀 **Ready to Implement!**
+
+I've analyzed this issue and I'm ready to start implementation.
+
+**What I'm going to do:**
+1. Trigger the GitHub Actions workflow
+2. Pass the issue context to the automation
+3. Monitor progress and provide updates
+
+Let's get this done! 💪
+
+---
+*Agent Billy is executing the implementation workflow*`);
+
+    // Trigger the GitHub Actions workflow
+    const success = await this.actions.triggerWorkflow(owner, repo, 'billy-implement', {
+      issue_number: issue.number,
+      issue_title: issue.title,
+      issue_body: issue.body,
+      issue_author: issue.user.login,
+      repository_name: repo,
+      repository_owner: owner
+    });
+
+    if (success) {
+      await this.actions.addLabel(owner, repo, issue.number, 'billy-implementing');
+      await this.actions.removeLabel(owner, repo, issue.number, 'for-billy');
+      console.log(`✅ Billy triggered GitHub Actions workflow for issue #${issue.number}`);
+    } else {
+      await this.actions.commentOnIssue(owner, repo, issue.number, 
+        `❌ **Workflow Trigger Failed**\n\nI wasn't able to trigger the GitHub Actions workflow. Please check:\n- The workflow file exists\n- Repository dispatch events are enabled\n- Billy has the required permissions`);
+    }
+  }
+
+  // Execute VM development workflow (Phase 3)
+  private async executeVMDevelopmentWorkflow(issue: any, repository: any, config: BillyConfig | null): Promise<void> {
+    const owner = repository.owner.login;
+    const repo = repository.name;
+
+    await this.actions.commentOnIssue(owner, repo, issue.number, 
+      `🚀 **Ready for VM Development!**
+
+I'm ready to implement this feature using a dedicated development environment.
+
+**VM Development Process:**
+1. 🖥️ Provision DigitalOcean VM
+2. 🔧 Set up environment using your Ansible playbook
+3. 💻 Install Claude Code CLI + Playwright MCP
+4. 🎯 Implement the feature autonomously
+5. 🔍 Test the implementation
+6. 📥 Create pull request with results
+7. 🧹 Clean up VM resources
+
+**Status:** Phase 3 implementation coming soon!
+
+---
+*This workflow is planned for Phase 3 development*`);
+
+    await this.actions.addLabel(owner, repo, issue.number, 'billy-vm-ready');
+    console.log(`🔄 VM development workflow queued for issue #${issue.number} (Phase 3)`);
+  }
+
+  // Execute simple comment workflow
+  private async executeSimpleCommentWorkflow(issue: any, repository: any): Promise<void> {
+    const owner = repository.owner.login;
+    const repo = repository.name;
+
+    const response = await this.processIssueWithLLM(issue);
+    if (response) {
+      const comment = await this.actions.commentOnIssue(owner, repo, issue.number, response);
+      if (comment) {
+        await this.actions.removeLabel(owner, repo, issue.number, 'for-billy');
+        console.log(`✅ Billy posted simple comment response to issue #${issue.number}`);
       }
     }
+  }
+
+  // Execute custom workflow
+  private async executeCustomWorkflow(issue: any, repository: any, config: BillyConfig | null): Promise<void> {
+    const owner = repository.owner.login;
+    const repo = repository.name;
+
+    await this.actions.commentOnIssue(owner, repo, issue.number, 
+      `🔧 **Custom Workflow Ready**
+
+I'm ready to execute your custom implementation workflow.
+
+**Status:** Custom webhook integration coming soon!
+
+---
+*Custom workflows are planned for future development*`);
+
+    console.log(`🔄 Custom workflow queued for issue #${issue.number}`);
   }
 
   // Find Billy's comment on an issue

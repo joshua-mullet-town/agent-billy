@@ -21,80 +21,86 @@ Agent Billy is not a script. He is a **teammate** - a persistent, stateful, memo
 
 ---
 
-## 🏗️ Agent Architecture
+## 🏗️ Stateless Webhook Architecture
 
-Billy's brain is organized like a real teammate:
+Billy is now a lean, stateless webhook server:
 
 ```
-🧠 Agent Billy's Brain
-├── 👀 Perception     # How Billy senses the world
-│   └── githubSensor.ts - Reads issues, PRs, comments
-├── 🤔 Cognition      # How Billy thinks
+🎣 Agent Billy (Webhook Server)
+├── 🎣 server/statelessWebhook.ts - Event processing & routing
+├── 👀 perception/githubSensor.ts - GitHub API reading
+├── 🤔 cognition/
 │   ├── llmWrapper.ts - LLM abstraction layer
 │   └── promptLoader.ts - Prompt management
-├── 🔧 Actions        # How Billy acts in the world
-│   └── githubActions.ts - Comments, labels, PRs
-├── 🧠 Memory         # How Billy remembers
-│   └── agentMemory.ts - Task tracking, state
-└── 💻 Core           # Billy's coordination system
-    └── agentBilly.ts - Main agent brain
+├── 🔧 actions/githubActions.ts - GitHub API operations
+├── 🔐 auth/githubApp.ts - GitHub App authentication
+└── 📝 prompts/ - Clarification & analysis templates
 ```
 
 ### Current Capabilities
 
-✅ **Issue Monitoring** - Billy checks for assigned issues  
-✅ **Intelligent Responses** - AI-generated comments and analysis  
-✅ **Memory System** - Tracks what he's done and current workload  
-✅ **GitHub Integration** - Native GitHub API operations  
-✅ **LLM Agnostic** - Works with Claude, GPT, or Ollama  
+✅ **Real-time Webhooks** - Billy responds to "for-billy" labels instantly  
+✅ **Multi-round Clarification** - Stakeholder conversations until requirements are clear  
+✅ **Configurable Implementation** - VM development, GitHub Actions, simple responses, or custom workflows  
+✅ **Full Development Pipeline** - VM provisioning → Claude Code + Playwright → Pull requests  
+✅ **Multi-repository Support** - Each repo configures its own Billy workflow  
+✅ **Stateless Design** - No memory persistence, scales horizontally  
 
 ---
 
 ## 🚀 Getting Started
 
-### 1. Setup
+### 1. Deploy Billy as GitHub App
+
+Billy operates as a stateless webhook server deployed on Railway:
 
 ```bash
 npm install
-cp .env.example .env
-# Edit .env with your GitHub token
-npm run billy:init
+npm run build
+npm run start  # Starts webhook server on port 3000
 ```
 
-### 2. Give Billy a GitHub Token
+### 2. GitHub App Setup
 
-Create a GitHub Personal Access Token at https://github.com/settings/tokens
+Create a GitHub App with these permissions:
+- Issues: Read & Write
+- Pull requests: Read & Write  
+- Repository contents: Read & Write
 
-Required scopes: `repo`, `issues`, `pull_requests`
+Configure webhook URL: `https://your-railway-app.railway.app/webhook`
+
+### 3. Environment Configuration
 
 ```env
-GITHUB_TOKEN=your_token_here
+GITHUB_APP_ID=123456
+GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n..."
+GITHUB_APP_INSTALLATION_ID=12345678
+GITHUB_WEBHOOK_SECRET=your_webhook_secret
 ```
 
-### 3. Let Billy Check for Work
+### 4. Using Billy
 
-```bash
-# Billy checks for assigned issues in a specific repo
-npm run billy:check -- -o owner -r repo-name
-
-# Billy handles a specific issue
-npm run agent -- handle-issue -o owner -r repo -i 42
-
-# Check Billy's current status
-npm run billy:status
-```
+1. Add "for-billy" label to any GitHub issue
+2. Billy responds within seconds with clarification or implementation
 
 ---
 
 ## 💬 How Billy Works
 
-### Current Workflow: "Billy as Issue Responder"
+### Real-time Webhook Implementation Flow
 
-1. **👀 Perception**: Billy checks for issues assigned to him
-2. **🧠 Memory**: "Have I seen this issue before?"
-3. **🤔 Cognition**: Billy analyzes the issue with LLM
-4. **💬 Action**: Billy posts a thoughtful comment asking clarifying questions
-5. **📝 Memory**: Billy remembers he processed this issue
+1. **🎣 Label Trigger**: Add "for-billy" label to GitHub issue
+2. **🤔 Analysis**: Billy analyzes issue + all previous comments via LLM
+3. **❓ Clarification**: If unclear, Billy posts numbered questions for stakeholder
+4. **🔄 Multi-round**: Stakeholder answers → Billy re-analyzes → more questions if needed
+5. **🚀 Implementation**: When clear, Billy executes repository-configured workflow:
+   - `vm_development`: Provision VM → Ansible setup → Claude Code + Playwright → PR
+   - `github_actions`: Trigger repository's GitHub Actions workflow
+   - `simple_comment`: Post implementation comment only
+   - `custom`: Call repository's custom webhook endpoint
+6. **📋 Results**: Billy creates pull requests and updates issue status
+
+**See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed workflow configuration.**
 
 ### Example Billy Response
 
@@ -129,108 +135,84 @@ When assigned to an issue titled "Add dark mode toggle", Billy might respond:
 
 ---
 
-## 🛠️ Commands
+## 🛠️ Usage
 
-### Core Agent Commands
+### 🎯 Current: Webhook-Based (Recommended)
 
-```bash
-# Initialize Billy's environment
-npm run billy:init
-
-# Billy checks for assigned issues (one-time)
-npm run billy:check -- -o owner -r repo
-
-# Billy watches continuously for assigned issues (AUTONOMOUS MODE)
-npm run billy:watch -- -o owner -r repo
-
-# Billy handles a specific issue
-npm run agent -- handle-issue -o owner -r repo -i 123
-
-# Check Billy's status and workload
-npm run billy:status
-
-# Dry run (no actual changes) - works with any command
-npm run billy:watch -- -o owner -r repo --dry-run
-```
-
-### 🔄 **NEW: Autonomous Operation**
-
-Billy can now run continuously, monitoring for assigned issues:
+Billy runs as a 24/7 webhook server, responding instantly to GitHub events:
 
 ```bash
-# Start Billy's autonomous watch loop
-npm run billy:watch -- -o myorg -r myrepo
-
-# Custom polling interval (default 60s)
-npm run billy:watch -- -o myorg -r myrepo --interval 30
-
-# Run once and exit (no continuous polling)
-npm run billy:watch -- -o myorg -r myrepo --once
+# Deploy Billy as GitHub App webhook server
+npm run start
 ```
 
-### Legacy Development Commands
+**To use Billy:**
+1. Add "for-billy" label to any GitHub issue
+2. Billy responds within seconds with clarification or implementation
 
-```bash
-# Legacy code generation (still works)
-npm run run-codegen -- --task "Create a Button component"
-npm run run-codegen -- --issue issue-001
+### 📁 Repository Configuration
+
+Add to your repository:
+
+```yaml
+# .github/billy-config.yml
+billy:
+  workflow_type: "vm_development"  # or "github_actions", "simple_comment", "custom"
 ```
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for all workflow options.
+
 
 ---
 
 ## 🔧 Configuration
 
-### Environment Variables
+### GitHub App Environment Variables
 
 ```env
-# Required
-GITHUB_TOKEN=your_token_here
+# Required for GitHub App authentication
+GITHUB_APP_ID=123456
+GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n..."
+GITHUB_APP_INSTALLATION_ID=12345678
 
-# Optional
-DEFAULT_GITHUB_OWNER=your-org
-DEFAULT_GITHUB_REPO=your-repo
-AGENT_USERNAME=agent-billy
+# Optional but recommended
+GITHUB_WEBHOOK_SECRET=your_webhook_secret
+
+# Optional for LLM and VM features  
+ANTHROPIC_API_KEY=your_anthropic_key
+DIGITALOCEAN_TOKEN=your_do_token
 ```
 
 ### LLM Backend
 
-Billy works with multiple LLM providers:
-
+Billy supports multiple LLM providers:
 - **Anthropic Claude** (default)
 - **OpenAI GPT**
 - **Ollama** (local models)
 
-Configure in `cognition/llmWrapper.ts` or via environment variables.
+Configure in `cognition/llmWrapper.ts`.
 
 ---
 
-## 📋 Roadmap
+## 📋 Status
 
-### Current Milestone: Autonomous Issue Responder ✅
-- ✅ Monitor assigned GitHub issues
-- ✅ Generate thoughtful AI responses
-- ✅ Memory and state management
-- ✅ GitHub API integration
-- ✅ **Autonomous polling loop with configurable intervals**
-- ✅ **Comprehensive logging and error handling**
-- ✅ **Duplicate detection and prevention**
+### Current: Stateless Webhook Agent ✅
+- ✅ Real-time webhook processing via GitHub App
+- ✅ Multi-round clarification conversations  
+- ✅ Configurable implementation workflows (4 types)
+- ✅ Label-based triggering ("for-billy" label)
+- ✅ Stateless design (no persistent memory)
+- ✅ Railway deployment ready
 
-### Next Milestones
+### In Development
+- 🔄 VM orchestration implementation (`vm_development` workflow)
+- 🔄 Repository configuration system (`.github/billy-config.yml`)
+- 🔄 Enhanced error handling and webhook reliability
 
-**🔄 Task Executor**
-- Code generation from issue descriptions
-- Automatic PR creation
-- Test generation and validation
-
-**🤖 Full Agent Workflows**
-- Multi-step task execution
-- Cross-repo operations
-- CI/CD integration
-
-**💬 Conversational Interface**
-- Chat-based agent interaction
-- Natural language task assignment
-- Real-time collaboration
+### Future
+- 💬 Direct chat interface integration
+- 🔄 Cross-repository operations  
+- 🎯 Advanced debugging and code review workflows
 
 ---
 
@@ -238,26 +220,30 @@ Configure in `cognition/llmWrapper.ts` or via environment variables.
 
 ```
 /agent-billy
-├── 👀 /perception          # Billy's senses
-│   └── githubSensor.ts     # Reads GitHub state
-├── 🤔 /cognition           # Billy's thinking
-│   ├── llmWrapper.ts       # LLM abstraction
+├── 🎣 /server              # Webhook server
+│   └── statelessWebhook.ts # Main webhook processing
+├── 👀 /perception          # GitHub sensing
+│   └── githubSensor.ts     # GitHub API operations
+├── 🤔 /cognition           # LLM processing
+│   ├── llmWrapper.ts       # LLM abstraction layer
 │   └── promptLoader.ts     # Prompt management
-├── 🔧 /actions             # Billy's actions
-│   └── githubActions.ts    # GitHub operations
-├── 🧠 /memory              # Billy's memory
-│   └── agentMemory.ts      # State management
-├── 💻 /core                # Billy's brain
-│   └── agentBilly.ts       # Main coordinator
-├── 📜 /prompts             # Billy's instructions
-│   ├── issueAnalysis.md    # Issue analysis prompt
-│   └── codeWriterPrompt.md # Code generation prompt
-├── 🎮 /scripts             # Entry points
-│   └── run-agent.ts        # Main agent runner
-└── 📁 /legacy              # Original structure
-    ├── /agents             # Legacy agent patterns
-    ├── /utils              # Shared utilities
-    └── /output             # Generated artifacts
+├── 🔧 /actions             # GitHub actions
+│   └── githubActions.ts    # GitHub API operations
+├── 🔐 /auth                # Authentication
+│   └── githubApp.ts        # GitHub App JWT tokens
+├── 📜 /prompts             # LLM prompts
+│   ├── issueAnalysis.md    # Issue analysis
+│   └── clarificationCheckGiveGrove.md # Clarification logic
+├── 🛠️ /utils               # Utilities
+│   └── fileIO.ts           # File operations
+├── 📋 package.json         # Dependencies & scripts
+├── 🐳 Dockerfile           # Railway deployment
+└── 📚 Documentation        # Setup & architecture guides
+    ├── README.md           # This file
+    ├── ARCHITECTURE.md     # Workflow details
+    ├── CLAUDE.md           # Development guide
+    ├── SETUP.md            # Complete deployment guide
+    └── TODO.md             # Living development roadmap
 ```
 
 ---

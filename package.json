@@ -5,23 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
-    "dev": "ts-node",
-    "agent": "ts-node scripts/run-agent.ts",
-    "billy:init": "ts-node scripts/run-agent.ts init",
-    "billy:check": "ts-node scripts/run-agent.ts check-issues",
-    "billy:status": "ts-node scripts/run-agent.ts status",
-    "billy:watch": "ts-node scripts/run-agent-loop.ts watch",
-    "billy:serve": "ts-node server/statelessWebhook.ts",
-    "billy:stateless": "ts-node server/statelessWebhook.ts",
-    "billy:enhanced": "ts-node scripts/run-enhanced-agent.ts",
-    "billy:watch-enhanced": "ts-node scripts/run-enhanced-agent.ts watch-enhanced",
-    "billy:status-enhanced": "ts-node scripts/run-enhanced-agent.ts status-enhanced",
-    "billy:handle-vm": "ts-node scripts/run-enhanced-agent.ts handle-issue-vm",
-    "billy:cleanup": "ts-node scripts/run-enhanced-agent.ts cleanup",
-    "billy:test-vm": "ts-node scripts/run-enhanced-agent.ts test-vm",
-    "run-codegen": "ts-node scripts/run-codegen.ts",
-    "run-playwrightgen": "ts-node scripts/run-playwrightgen.ts",
-    "run-prgen": "ts-node scripts/run-prgen.ts"
+    "start": "ts-node server/statelessWebhook.ts"
   },
   "keywords": [
     "ai",
@@ -40,7 +24,6 @@
   },
   "dependencies": {
     "axios": "^1.6.0",
-    "commander": "^11.0.0",
     "dotenv": "^17.0.0",
     "jsonwebtoken": "^9.0.0"
   }

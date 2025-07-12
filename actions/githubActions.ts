@@ -228,4 +228,34 @@ export class GitHubActions {
       return null;
     }
   }
+
+  // Billy can trigger GitHub Actions via repository dispatch
+  async triggerWorkflow(
+    owner: string,
+    repo: string,
+    eventType: string,
+    payload: any = {}
+  ): Promise<boolean> {
+    try {
+      await axios.post(
+        `${this.baseURL}/repos/${owner}/${repo}/dispatches`,
+        {
+          event_type: eventType,
+          client_payload: payload
+        },
+        { headers: await this.getHeaders(owner, repo) }
+      );
+      
+      console.log(`🚀 Billy triggered workflow "${eventType}" in ${owner}/${repo}`);
+      return true;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        console.error(`❌ Failed to trigger workflow "${eventType}" (${error.response?.status}):`, 
+          error.response?.data?.message || error.message);
+      } else {
+        console.error(`❌ Failed to trigger workflow "${eventType}":`, error instanceof Error ? error.message : String(error));
+      }
+      return false;
+    }
+  }
 }

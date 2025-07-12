@@ -1,8 +1,0 @@
-{
-  "id": 1,
-  "title": "Create a reusable Button component",
-  "body": "We need a reusable Button component for our React application. The component should:\n\n- Accept children as props\n- Support different variants (primary, secondary, danger)\n- Handle click events\n- Be fully typed with TypeScript\n- Include proper accessibility attributes\n- Support disabled state\n\nThe component should follow our existing design system patterns and be exportable from a components directory.",
-  "labels": ["enhancement", "component", "react"],
-  "assignee": "dev-team",
-  "state": "open"
-}

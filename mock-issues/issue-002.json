@@ -1,8 +1,0 @@
-{
-  "id": 2,
-  "title": "Add dark mode toggle functionality",
-  "body": "Implement a dark mode toggle feature that:\n\n- Provides a toggle switch component\n- Stores theme preference in localStorage\n- Updates CSS custom properties for dark/light themes\n- Includes smooth transitions between modes\n- Works across all components\n- Persists user preference between sessions\n\nThe implementation should use React Context for state management and include proper TypeScript types.",
-  "labels": ["feature", "ui", "accessibility"],
-  "assignee": "frontend-team",
-  "state": "open"
-}

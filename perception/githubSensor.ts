@@ -221,4 +221,35 @@ export class GitHubSensor {
       return [];
     }
   }
+
+  // Billy reads file content from a repository
+  async getFileContent(owner: string, repo: string, path: string): Promise<string | null> {
+    try {
+      const response = await axios.get(
+        `${this.baseURL}/repos/${owner}/${repo}/contents/${path}`,
+        {
+          headers: await this.getHeaders(owner, repo)
+        }
+      );
+
+      // GitHub API returns base64 encoded content
+      if (response.data.content && response.data.encoding === 'base64') {
+        return Buffer.from(response.data.content, 'base64').toString('utf-8');
+      }
+
+      return response.data.content || null;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 404) {
+          console.log(`📄 File ${path} not found in ${owner}/${repo}`);
+        } else {
+          console.error(`❌ Failed to fetch file ${path} from ${owner}/${repo} (${error.response?.status}):`, 
+            error.response?.data?.message || error.message);
+        }
+      } else {
+        console.error(`❌ Failed to fetch file ${path}:`, error instanceof Error ? error.message : String(error));
+      }
+      return null;
+    }
+  }
 }

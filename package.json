@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
-    "start": "ts-node server/statelessWebhook.ts"
+    "start": "ts-node server/statelessWebhook.ts",
+    "billy:stateless": "ts-node server/statelessWebhook.ts"
   },
   "keywords": [
     "ai",

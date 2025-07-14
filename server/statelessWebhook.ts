@@ -283,30 +283,42 @@ I'm ready to execute your custom implementation workflow.
       });
 
       const content = response.content.trim();
+      console.log(`🤔 Billy's LLM analysis result: ${content.substring(0, 200)}...`);
 
-      if (content.includes('✅ Ready to proceed.')) {
-        return { needsClarification: false };
-      } else if (content.includes('❓ Need clarification on:')) {
-        let questions = content.replace('❓ Need clarification on:', '').trim();
+      try {
+        // Parse JSON response from LLM
+        const analysis = JSON.parse(content);
         
-        // Extract only numbered questions
-        const lines = questions.split('\n');
-        const questionLines: string[] = [];
-        for (const line of lines) {
-          if (line.match(/^\d+\./) || (questionLines.length > 0 && line.startsWith('   '))) {
-            questionLines.push(line);
-          } else if (line.trim() === '') {
-            if (questionLines.length > 0) questionLines.push(line);
-          } else {
-            break;
-          }
+        switch (analysis.status) {
+          case 'ready':
+            console.log(`🚀 Billy determined he's ready to implement: ${analysis.summary}`);
+            return { needsClarification: false };
+            
+          case 'needs_clarification':
+            console.log(`❓ Billy needs clarification on ${analysis.questions?.length || 0} points`);
+            const questionsText = analysis.questions
+              ? analysis.questions.map((q: string, i: number) => `${i + 1}. ${q}`).join('\n')
+              : 'Please provide more details.';
+            return { needsClarification: true, questions: questionsText };
+            
+          case 'reconsider':
+            console.log(`🛑 Billy thinks this issue needs reconsideration`);
+            const reconsiderText = `**Issues with this request:**\n${analysis.reasons?.map((r: string, i: number) => `${i + 1}. ${r}`).join('\n') || 'This needs to be reconsidered.'}\n\n**My recommendations:**\n${analysis.recommendations?.map((r: string, i: number) => `${i + 1}. ${r}`).join('\n') || 'Please clarify the requirements.'}`;
+            return { needsClarification: true, questions: reconsiderText };
+            
+          default:
+            console.log(`⚠️ Unknown status from LLM: ${analysis.status}, defaulting to no clarification needed`);
+            return { needsClarification: false };
         }
-        
-        questions = questionLines.join('\n').trim();
-        return { needsClarification: true, questions };
+      } catch (error) {
+        console.error(`❌ Failed to parse LLM JSON response: ${error}. Raw content: ${content}`);
+        // Fallback to old string parsing for robustness
+        if (content.toLowerCase().includes('ready') || content.toLowerCase().includes('proceed')) {
+          return { needsClarification: false };
+        } else {
+          return { needsClarification: true, questions: 'Please provide more details about this request.' };
+        }
       }
-
-      return { needsClarification: false };
     } catch (error) {
       console.error('❌ Failed to check clarification needs:', error);
       return { needsClarification: false };

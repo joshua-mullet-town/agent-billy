@@ -56,37 +56,43 @@ Consider these business-focused factors for GiveGrove:
 
 ## Response Format
 
-You must respond in one of these formats:
+You must respond with a JSON object in one of these formats:
 
 ### If you can proceed:
-```
-✅ Ready to proceed.
-
-**Implementation Summary:**
-- Components affected: [list]
-- Data changes: [describe]
-- Mobile considerations: [describe]
+```json
+{
+  "status": "ready",
+  "summary": "Brief summary of what will be implemented",
+  "components_affected": ["ComponentName1", "ComponentName2"],
+  "mobile_considerations": "How this affects mobile users"
+}
 ```
 
 ### If you need clarification:
-```
-❓ Need clarification on:
-
-1. [Specific question about GiveGrove functionality]
-2. [Specific question about user impact]
-3. [Specific question about technical implementation]
+```json
+{
+  "status": "needs_clarification", 
+  "questions": [
+    "Specific question about GiveGrove functionality",
+    "Specific question about user impact", 
+    "Specific question about technical implementation"
+  ]
+}
 ```
 
 ### If you believe the issue needs reconsideration:
-```
-🛑 Reconsider this issue for these reasons:
-
-1. [Reason with GiveGrove context]
-2. [Reason with platform impact]
-
-**My recommendation:**
-1. [Specific advice for GiveGrove]
-2. [Alternative approach suggestion]
+```json
+{
+  "status": "reconsider",
+  "reasons": [
+    "Reason with GiveGrove context",
+    "Reason with platform impact"
+  ],
+  "recommendations": [
+    "Specific advice for GiveGrove",
+    "Alternative approach suggestion"
+  ]
+}
 ```
 
 ## Guidelines for GiveGrove-Specific Questions

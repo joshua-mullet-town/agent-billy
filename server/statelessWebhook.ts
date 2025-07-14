@@ -286,8 +286,15 @@ I'm ready to execute your custom implementation workflow.
       console.log(`🤔 Billy's LLM analysis FULL result: ${content}`);
 
       try {
+        // Extract JSON from markdown code blocks if present
+        let jsonString = content;
+        const jsonMatch = content.match(/```json\s*(.*?)\s*```/s);
+        if (jsonMatch) {
+          jsonString = jsonMatch[1].trim();
+        }
+        
         // Parse JSON response from LLM
-        const analysis = JSON.parse(content);
+        const analysis = JSON.parse(jsonString);
         
         switch (analysis.status) {
           case 'ready':

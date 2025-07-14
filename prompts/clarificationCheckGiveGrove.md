@@ -61,10 +61,7 @@ You must respond with a JSON object in one of these formats:
 ### If you can proceed:
 ```json
 {
-  "status": "ready",
-  "summary": "Brief summary of what will be implemented",
-  "components_affected": ["ComponentName1", "ComponentName2"],
-  "mobile_considerations": "How this affects mobile users"
+  "status": "ready"
 }
 ```
 

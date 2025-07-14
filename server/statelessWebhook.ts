@@ -291,7 +291,7 @@ I'm ready to execute your custom implementation workflow.
         
         switch (analysis.status) {
           case 'ready':
-            console.log(`🚀 Billy determined he's ready to implement: ${analysis.summary}`);
+            console.log(`🚀 Billy determined he's ready to implement`);
             return { needsClarification: false };
             
           case 'needs_clarification':

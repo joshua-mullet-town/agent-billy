@@ -283,7 +283,7 @@ I'm ready to execute your custom implementation workflow.
       });
 
       const content = response.content.trim();
-      console.log(`🤔 Billy's LLM analysis result: ${content.substring(0, 200)}...`);
+      console.log(`🤔 Billy's LLM analysis FULL result: ${content}`);
 
       try {
         // Parse JSON response from LLM

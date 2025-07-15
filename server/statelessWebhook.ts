@@ -478,9 +478,12 @@ ansible_ssh_common_args='-o StrictHostKeyChecking=no'`;
 
   // Generate VM setup with SSH key directly in cloud-config
   // CRITICAL: This approach was learned through painful debugging - see CLAUDE.md for details
-  // DEPLOYMENT TIMESTAMP: 2025-07-15T17:08:00Z - Force Railway deployment
+  // FIXED: Avoid template variables that break YAML parsing
   private generateVMSetupScript(owner: string, repo: string, playbookPath: string, issue: any): string {
     const githubToken = process.env.GITHUB_TOKEN || '';
+    const issueNum = issue.number.toString();
+    const repoOwner = owner.replace(/[^a-zA-Z0-9-]/g, '');
+    const repoName = repo.replace(/[^a-zA-Z0-9-]/g, '');
     
     return `#cloud-config
 users:
@@ -501,12 +504,19 @@ packages:
   - x11vnc
   - firefox
 
+write_files:
+  - path: /tmp/github_token
+    content: ${githubToken}
+    permissions: '0600'
+    owner: ubuntu:ubuntu
+
 runcmd:
   - echo "Billy VM AUTOMATION TEST - started at $(date)" > /var/log/billy-status.log
   - echo "SSH key installed via cloud-config" >> /var/log/billy-status.log
-  - echo "Issue ${issue.number} processed" >> /var/log/billy-status.log
-  - echo "Repository ${owner}/${repo}" >> /var/log/billy-status.log
+  - echo "Issue ${issueNum} processed" >> /var/log/billy-status.log
+  - echo "Repository ${repoOwner}/${repoName}" >> /var/log/billy-status.log
   - echo "Installing GUI environment and browser..." >> /var/log/billy-status.log
+  - cd /var/log && python3 -m http.server 8080 &
   - mkdir -p /home/ubuntu/logs
   - chown ubuntu:ubuntu /home/ubuntu/logs
   - chmod 755 /home/ubuntu/logs
@@ -523,8 +533,10 @@ runcmd:
   - if pgrep x11vnc > /dev/null; then echo "✅ x11vnc running" >> /var/log/billy-status.log; else echo "❌ x11vnc FAILED" >> /var/log/billy-status.log; fi
   - if ss -tlnp | grep :5900 > /dev/null; then echo "✅ VNC port 5900 open" >> /var/log/billy-status.log; else echo "❌ VNC port 5900 FAILED" >> /var/log/billy-status.log; fi
   - echo "Cloning GiveGrove repository..." >> /var/log/billy-status.log
-  - if sudo -u ubuntu git clone https://${githubToken}@github.com/${owner}/${repo}.git /home/ubuntu/GiveGrove; then echo "✅ GiveGrove cloned successfully" >> /var/log/billy-status.log; else echo "❌ GiveGrove clone FAILED" >> /var/log/billy-status.log; fi
+  - TOKEN=$(cat /tmp/github_token)
+  - if sudo -u ubuntu git clone https://\${TOKEN}@github.com/${repoOwner}/${repoName}.git /home/ubuntu/GiveGrove; then echo "✅ GiveGrove cloned successfully" >> /var/log/billy-status.log; else echo "❌ GiveGrove clone FAILED" >> /var/log/billy-status.log; fi
   - if [ -d "/home/ubuntu/GiveGrove" ]; then echo "✅ GiveGrove directory exists" >> /var/log/billy-status.log; else echo "❌ GiveGrove directory MISSING" >> /var/log/billy-status.log; fi
+  - rm -f /tmp/github_token
   - echo "VM is ready for Ansible execution from Railway" >> /var/log/billy-status.log
   - echo "Billy VM automation validation completed at $(date)" >> /var/log/billy-status.log
 `;

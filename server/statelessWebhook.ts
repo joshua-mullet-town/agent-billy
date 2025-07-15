@@ -277,8 +277,8 @@ I'm now implementing this feature using a dedicated development environment.
 
 **Phase 1 Testing:**
 - 🔍 Testing SSH connectivity
-- 🔍 Verifying basic cloud-config execution
-- 🔍 Checking web server accessibility
+- 🔍 Verifying cloud-config execution via SSH
+- 🔍 Checking basic VM setup completion
 
 *Testing minimal setup before Ansible execution...*`);
 
@@ -320,8 +320,8 @@ I'm now implementing this feature using a dedicated development environment.
         
 **Phase 1 Results:**
 - ✅ SSH connectivity working
-- ✅ Basic cloud-config executed successfully  
-- ✅ Web server accessible on port 8080
+- ✅ Cloud-config executed successfully  
+- ✅ VM ready for Ansible execution
 
 **Phase 2 Starting:**
 - 🔧 Running Ansible playbook for desktop environment
@@ -443,24 +443,40 @@ Please check the configuration and try again.
         return false;
       }
 
-      // Test 2: Web server accessibility (indicates cloud-config worked)
-      console.log(`🌐 Testing web server accessibility on ${vmIp}:8080`);
-      const axios = require('axios');
+      // Test 2: Verify cloud-config completed via SSH (external web server may be blocked by firewall)
+      console.log(`📋 Testing cloud-config completion via SSH on ${vmIp}`);
       
       try {
-        const response = await axios.get(`http://${vmIp}:8080/billy-basic-setup.log`, {
-          timeout: 10000
+        const cloudConfigTest = await new Promise<boolean>((resolve) => {
+          const testProcess = spawn('ssh', [
+            '-i', '/tmp/ssh_key',
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'ConnectTimeout=10',
+            `ubuntu@${vmIp}`,
+            'test -f /var/log/billy-basic-setup.log && grep "Basic setup completed" /var/log/billy-basic-setup.log'
+          ], { stdio: 'pipe' });
+
+          let output = '';
+          testProcess.stdout.on('data', (data: Buffer) => {
+            output += data.toString();
+          });
+
+          testProcess.on('close', (code: number) => {
+            const success = code === 0 && output.includes('Basic setup completed');
+            console.log(`📋 Cloud-config test result: ${success ? 'SUCCESS' : 'FAILED'} (code: ${code})`);
+            resolve(success);
+          });
+
+          setTimeout(() => {
+            testProcess.kill();
+            console.log(`📋 Cloud-config test timed out`);
+            resolve(false);
+          }, 15000);
         });
-        
-        if (response.status === 200 && response.data.includes('Basic setup completed')) {
-          console.log(`✅ Web server accessible and cloud-config completed successfully`);
-          return true;
-        } else {
-          console.log(`⚠️ Web server accessible but setup may be incomplete`);
-          return false;
-        }
+
+        return cloudConfigTest;
       } catch (error) {
-        console.log(`❌ Web server not accessible: ${error}`);
+        console.log(`❌ Cloud-config verification failed: ${error}`);
         return false;
       }
 

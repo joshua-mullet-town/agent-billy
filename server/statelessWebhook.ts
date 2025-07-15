@@ -471,6 +471,7 @@ ansible_ssh_common_args='-o StrictHostKeyChecking=no'`;
 
   // Generate VM setup with SSH key directly in cloud-config
   // CRITICAL: This approach was learned through painful debugging - see CLAUDE.md for details
+  // DEPLOYMENT TIMESTAMP: 2025-07-15T17:08:00Z - Force Railway deployment
   private generateVMSetupScript(owner: string, repo: string, playbookPath: string, issue: any): string {
     const githubToken = process.env.GITHUB_TOKEN || '';
     

@@ -90,7 +90,7 @@ export class ConfigReader {
       if (trimmed.startsWith('#') || !trimmed) continue;
 
       if (trimmed.includes('workflow_type:')) {
-        const value = trimmed.split(':')[1]?.trim().replace(/['"]/g, '');
+        const value = trimmed.split(':')[1]?.split('#')[0]?.trim().replace(/['"]/g, '');
         if (value === 'github_actions' || value === 'vm_development' || value === 'simple_comment' || value === 'custom') {
           config.billy.workflow_type = value;
         }

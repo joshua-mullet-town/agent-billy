@@ -1,5 +1,8 @@
 FROM node:18-alpine
 
+# Install git and other required tools for VM orchestration
+RUN apk add --no-cache git openssh-client
+
 WORKDIR /app
 
 # Copy package files

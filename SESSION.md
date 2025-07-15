@@ -13,6 +13,48 @@
 2. **Test Ansible Playbook Execution**: Verify Billy can run `ansible/claude-code-environment.yml` in the VM
 3. **Install and Test Claude Code CLI**: Ensure Claude Code CLI + Playwright MCP work in VM for autonomous development
 
+## DETAILED IMPLEMENTATION PLAN (Phase 3 VM Development Environment)
+
+### **Testing Strategy - BRILLIANT APPROACH**
+- ✅ Use existing working VM (159.203.123.65) for incremental testing
+- ✅ Only create new VMs when testing complete deployment flow
+- ✅ Test SSH first, then cloud-init, then full workflow
+- ✅ Document issues as they arise for future agents
+
+### **Step-by-Step Execution Plan**
+1. **Update Cloud-Config for Full Development Environment**
+   - Add git, ansible, nodejs, npm installation to cloud-config
+   - Clone south-bend-code-works/GiveGrove repository
+   - Set up proper file permissions and directory structure
+
+2. **Test Ansible Playbook Execution**
+   - Verify Billy runs `ansible/claude-code-environment.yml` successfully
+   - Debug any Ansible-specific issues that arise
+   - Document Ansible integration patterns
+
+3. **Install Claude Code CLI + Playwright MCP**
+   - Install Claude Code CLI via npm
+   - Set up Playwright MCP integration
+   - Test basic Claude Code functionality in VM
+
+4. **Implement Autonomous Feature Development**
+   - Billy uses Claude Code to implement "Hello World" README change
+   - Test the complete development workflow
+   - Verify code quality and functionality
+
+5. **Create Pull Request**
+   - Billy creates PR back to target repository
+   - Test PR creation workflow and permissions
+   - Verify PR contains working implementation
+
+6. **VM Cleanup and Cost Management**
+   - Billy destroys VM after successful completion
+   - Clean up old test VMs to avoid unnecessary costs
+   - Document proper VM lifecycle management
+
+### **Success Criteria**
+Phase 3 complete when Billy can: provision VM → run Ansible → use Claude Code CLI → implement features → create PRs → cleanup resources
+
 ## Your Role
 **AUTONOMOUS MODE REQUESTED** - Continue working independently on VM workflow expansion. Document discoveries and debug issues as they arise. Only surface blockers or major decisions.
 

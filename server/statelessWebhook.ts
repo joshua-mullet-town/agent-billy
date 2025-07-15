@@ -310,7 +310,14 @@ I'm now implementing this feature using a dedicated development environment.
         formattedKey += '\n';
       }
       
-      console.log(`🔑 Writing SSH key to ${sshKeyPath} (${formattedKey.length} chars)`);
+      console.log(`🔑 SSH Key Debug Information:`);
+      console.log(`📊 Raw key length: ${sshKey.length} chars`);
+      console.log(`🔤 Contains literal \\n: ${sshKey.includes('\\n')}`);
+      console.log(`🔤 Contains actual newlines: ${sshKey.includes('\n')}`);
+      console.log(`🔤 Raw first 100 chars: "${sshKey.substring(0, 100)}"`);
+      console.log(`📝 Formatted key length: ${formattedKey.length} chars`);
+      console.log(`🔤 Formatted first 100 chars: "${formattedKey.substring(0, 100)}"`);
+      console.log(`🔑 Writing SSH key to ${sshKeyPath}`);
       fs.writeFileSync(sshKeyPath, formattedKey, { mode: 0o600 });
 
       // PHASE 1: Test SSH connectivity and basic setup

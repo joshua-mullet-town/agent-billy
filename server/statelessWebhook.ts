@@ -231,9 +231,10 @@ I'm now implementing this feature using a dedicated development environment.
       // Generate unique VM name
       const vmName = `billy-${repo}-${issue.number}-${Date.now()}`.toLowerCase().replace(/[^a-z0-9-]/g, '-');
       
-      // Get VM config from repository config or use defaults
+      // Get VM config from repository config or use defaults  
       const vmSize = config?.billy.vm_development?.vm_size || 's-2vcpu-2gb';
-      const playbookPath = config?.billy.vm_development?.ansible_playbook || 'ansible/billy-development-environment.yml';
+      // TEMPORARY: Use local test playbook until proven working end-to-end
+      const playbookPath = 'test-complete-environment.yml';
       
       console.log(`🔧 VM Config - Size: ${vmSize}, Playbook: ${playbookPath}`);
 
@@ -543,32 +544,20 @@ Please check the configuration and try again.
       const tempDir = `/tmp/ansible-${Date.now()}`;
       fs.mkdirSync(tempDir, { recursive: true });
       
-      // Clone the target repository to access ansible playbook
-      console.log(`📋 Cloning ${owner}/${repo} to access ansible playbook`);
-      const githubToken = process.env.GITHUB_TOKEN || '';
-      if (!githubToken) {
-        throw new Error('GITHUB_TOKEN environment variable is required for repository access');
-      }
+      // TEMPORARY: Use Billy's local playbook instead of target repository's
+      console.log(`📋 Using Billy's local test playbook: ${playbookPath}`);
+      const repoPath = tempDir; // Use temp directory directly
+      const ansiblePath = tempDir; // Ansible files are in Billy's working directory
       
-      const cloneProcess = spawn('git', ['clone', `https://x-access-token:${githubToken}@github.com/${owner}/${repo}.git`, 'repo'], {
-        cwd: tempDir,
-        stdio: 'pipe'
-      });
+      // Copy local test playbook and secrets to temp directory
+      const localPlaybookPath = path.join(process.cwd(), playbookPath);
+      const localSecretsPath = path.join(process.cwd(), 'secrets.yml');
+      const localVaultPassPath = path.join(process.cwd(), '.vault_pass');
       
-      await new Promise((resolve, reject) => {
-        cloneProcess.on('close', (code: number) => {
-          if (code === 0) {
-            console.log(`✅ Repository cloned successfully`);
-            resolve(true);
-          } else {
-            console.error(`❌ Failed to clone repository, exit code: ${code}`);
-            reject(new Error(`Git clone failed with code ${code}`));
-          }
-        });
-      });
-      
-      const repoPath = path.join(tempDir, 'repo');
-      const ansiblePath = path.join(repoPath, 'ansible');
+      fs.copyFileSync(localPlaybookPath, path.join(ansiblePath, playbookPath));
+      fs.copyFileSync(localSecretsPath, path.join(ansiblePath, 'secrets.yml'));
+      fs.copyFileSync(localVaultPassPath, path.join(ansiblePath, '.vault_pass'));
+      console.log(`✅ Copied local Ansible files to temp directory`);
       
       // Create dynamic inventory file with the VM IP
       const inventoryPath = path.join(ansiblePath, 'dynamic_inventory.yml');
@@ -592,7 +581,7 @@ ansible_ssh_common_args='-o StrictHostKeyChecking=no'`;
       const sshKeyPath = '/tmp/ssh_key';
       
       // Run ansible-playbook
-      const playbookFullPath = path.join(ansiblePath, playbookPath.replace('ansible/', ''));
+      const playbookFullPath = path.join(ansiblePath, playbookPath);
       
       return new Promise((resolve) => {
         const ansibleProcess = spawn('ansible-playbook', [

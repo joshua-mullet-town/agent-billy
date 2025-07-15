@@ -23,11 +23,19 @@ This tracks the big milestones from current webhook server to fully functional i
 
 ## 🔄 In Progress
 
-### Phase 3: VM Development Workflow
+### Phase 3: VM Development Workflow - LOCAL SOURCE OF TRUTH STRATEGY
+
+**STRATEGY CHANGE**: Keep `test-complete-environment.yml` in Billy repo as source of truth until end-to-end success proven via GitHub labeling.
+
+**Progress:**
 - [x] **Billy provisions DigitalOcean VM** - ✅ WORKING - Billy creates VMs with SSH access via cloud-config
-- [x] **SSH Access to VMs** - ✅ WORKING - SSH keys embedded in cloud-config, documented in CLAUDE.md
-- [ ] **Billy runs target repo's Ansible** - VM gets set up using the repository's playbook  
-- [ ] **Claude Code CLI installed** - Verify Claude Code is working on the VM
+- [x] **SSH Access to VMs** - ✅ WORKING - SSH keys embedded in cloud-config, documented in CLAUDE.md  
+- [x] **Root cause identified** - ✅ COMPLETE - Both GiveGrove playbooks missing Node.js installation
+- [x] **Fixed playbook locally** - ✅ COMPLETE - `test-complete-environment.yml` with Node.js installation
+- [ ] **Local Ansible test successful** - 🔄 TESTING - Manual Ansible run on VM 157.245.125.12
+- [ ] **Update Billy to use local playbook** - Point Billy to `test-complete-environment.yml` in Billy repo
+- [ ] **End-to-end GitHub label test** - Add "for-billy" label → complete automation success
+- [ ] **Transfer to GiveGrove** - Only after proven end-to-end success
 - [ ] **Playwright MCP integration** - Prove Playwright MCP is connected and functional
 - [ ] **Billy codes/tests autonomously** - Watch Billy actually implement/test the feature using Claude Code + Playwright MCP
 - [ ] **Billy creates working PR** - PR gets created back to target repo with working code

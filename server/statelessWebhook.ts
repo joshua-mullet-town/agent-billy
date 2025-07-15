@@ -497,11 +497,14 @@ runcmd:
   - echo "Issue ${issue.number} processed" >> /var/log/billy-status.log
   - echo "Repository ${owner}/${repo}" >> /var/log/billy-status.log
   - echo "Installing GUI environment and browser..." >> /var/log/billy-status.log
-  - sudo -u ubuntu DISPLAY=:99 nohup Xvfb :99 -screen 0 1920x1080x24 >/tmp/xvfb.log 2>&1 &
+  - mkdir -p /home/ubuntu/logs
+  - chown ubuntu:ubuntu /home/ubuntu/logs
+  - chmod 755 /home/ubuntu/logs
+  - sudo -u ubuntu DISPLAY=:99 nohup Xvfb :99 -screen 0 1920x1080x24 >/home/ubuntu/logs/xvfb.log 2>&1 &
   - sleep 3
-  - sudo -u ubuntu DISPLAY=:99 nohup fluxbox >/tmp/fluxbox.log 2>&1 &
+  - sudo -u ubuntu DISPLAY=:99 nohup fluxbox >/home/ubuntu/logs/fluxbox.log 2>&1 &
   - sleep 2
-  - sudo -u ubuntu DISPLAY=:99 nohup x11vnc -display :99 -forever -shared -bg -nopw -xkb -listen 0.0.0.0 -rfbport 5900 >/tmp/vnc.log 2>&1 &
+  - sudo -u ubuntu DISPLAY=:99 nohup x11vnc -display :99 -forever -shared -bg -nopw -xkb -listen 0.0.0.0 -rfbport 5900 >/home/ubuntu/logs/vnc.log 2>&1 &
   - sleep 2
   - echo "Desktop environment ready - VNC accessible on port 5900" >> /var/log/billy-status.log
   - echo "VM is ready for Ansible execution from Railway" >> /var/log/billy-status.log

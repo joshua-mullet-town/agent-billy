@@ -1,7 +1,7 @@
 FROM node:18-alpine
 
-# Install git and other required tools for VM orchestration
-RUN apk add --no-cache git openssh-client
+# Install git, ssh, ansible and other required tools for VM orchestration
+RUN apk add --no-cache git openssh-client ansible python3 py3-pip
 
 WORKDIR /app
 

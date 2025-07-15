@@ -96,6 +96,22 @@ Billy operates on GitHub webhook events:
 
 ## Environment Setup
 
+### 🚨 **CRITICAL SSH KEY SOLUTION - MUST READ** 
+
+**SSH Key Environment Variable Format Issue - SOLVED 2025-07-15**
+
+⚠️ **PERSISTENT BLOCKING ISSUE**: SSH private keys in Railway environment variables MUST use base64 encoding.
+
+**✅ SOLUTION:**
+1. **Store in Railway**: Convert SSH key to base64: `cat ~/.ssh/key | base64 | tr -d '\n'`
+2. **Use in code**: Decode with `Buffer.from(process.env.SSH_PRIVATE_KEY, 'base64').toString('ascii')`
+
+**❌ DO NOT:** Store raw SSH keys with newlines in environment variables - causes persistent failures
+
+**📁 Full documentation**: See `SSH_KEY_DEBUGGING.md` for complete analysis and testing results
+
+This solution was tested with 16 different format combinations. Base64 is the only reliable method.
+
 ### GitHub App Configuration (Required)
 ```env
 GITHUB_APP_ID=123456

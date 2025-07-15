@@ -282,21 +282,39 @@ I'm now implementing this feature using a dedicated development environment.
 
 *Testing minimal setup before Ansible execution...*`);
 
-      // Create SSH key file for testing and Ansible
+      // Create SSH key file for testing and Ansible with proper formatting
       const fs = require('fs');
       const sshKeyPath = '/tmp/ssh_key';
       const sshKey = process.env.SSH_PRIVATE_KEY || '';
       if (!sshKey) {
         throw new Error('SSH_PRIVATE_KEY environment variable not found');
       }
-      fs.writeFileSync(sshKeyPath, sshKey.replace(/\\n/g, '\n'), { mode: 0o600 });
+      
+      // Fix SSH key formatting: Railway may store with literal \n or missing newlines
+      let formattedKey = sshKey;
+      
+      // Replace literal \n with actual newlines
+      formattedKey = formattedKey.replace(/\\n/g, '\n');
+      
+      // Ensure proper SSH key format with newlines after headers/footers
+      if (!formattedKey.includes('\n')) {
+        // If no newlines at all, add them around BEGIN/END markers
+        formattedKey = formattedKey
+          .replace(/-----BEGIN/, '\n-----BEGIN')
+          .replace(/-----END/, '\n-----END')
+          .replace(/KEY-----/, 'KEY-----\n');
+      }
+      
+      // Ensure the key ends with a newline
+      if (!formattedKey.endsWith('\n')) {
+        formattedKey += '\n';
+      }
+      
+      console.log(`🔑 Writing SSH key to ${sshKeyPath} (${formattedKey.length} chars)`);
+      fs.writeFileSync(sshKeyPath, formattedKey, { mode: 0o600 });
 
       // PHASE 1: Test SSH connectivity and basic setup
-      // TEMPORARY: Skip SSH test since VM setup is proven to work manually
-      // Issue: Railway SSH_PRIVATE_KEY format causing false failures
-      console.log(`⚠️ Skipping Phase 1 SSH test due to Railway SSH key format issues`);
-      console.log(`✅ Manual verification confirmed VM ${readyVM.publicIp} is working perfectly`);
-      const phase1Success = true; // await this.testPhase1Setup(readyVM.publicIp || 'unknown');
+      const phase1Success = await this.testPhase1Setup(readyVM.publicIp || 'unknown');
       
       if (!phase1Success) {
         await this.actions.commentOnIssue(owner, repo, issue.number, 

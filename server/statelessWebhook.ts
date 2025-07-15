@@ -16,7 +16,14 @@ export class StatelessWebhookServer {
   private configReader: ConfigReader;
 
   constructor() {
-    this.sensor = new GitHubSensor();
+    // Initialize GitHub sensor with explicit authentication
+    const githubAppConfig = {
+      appId: process.env.GITHUB_APP_ID!,
+      privateKey: process.env.GITHUB_APP_PRIVATE_KEY!,
+      installationId: process.env.GITHUB_APP_INSTALLATION_ID!
+    };
+    
+    this.sensor = new GitHubSensor(process.env.GITHUB_TOKEN, githubAppConfig);
     this.actions = new GitHubActions();
     this.configReader = new ConfigReader();
   }

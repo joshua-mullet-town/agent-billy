@@ -268,18 +268,66 @@ I'm now implementing this feature using a dedicated development environment.
       
       // Update with ready status
       await this.actions.commentOnIssue(owner, repo, issue.number, 
-        `🎉 **VM Ready - Starting Ansible Playbook!**
+        `🎉 **VM Ready - Testing Phase 1 Setup!**
         
 **VM Status:**
 - ✅ VM is running
 - ✅ Public IP: ${readyVM.publicIp}
 - ✅ Basic setup completed
 
-**Next Phase:**
-- 🔧 Running Ansible playbook for full dev environment
-- 📦 Installing Node.js, npm, Firebase CLI
-- 🎭 Setting up Claude Code CLI + Playwright MCP
-- 🖥️  Configuring GUI environment with VNC
+**Phase 1 Testing:**
+- 🔍 Testing SSH connectivity
+- 🔍 Verifying basic cloud-config execution
+- 🔍 Checking web server accessibility
+
+*Testing minimal setup before Ansible execution...*`);
+
+      // Create SSH key file for testing and Ansible
+      const fs = require('fs');
+      const sshKeyPath = '/tmp/ssh_key';
+      const sshKey = process.env.SSH_PRIVATE_KEY || '';
+      if (!sshKey) {
+        throw new Error('SSH_PRIVATE_KEY environment variable not found');
+      }
+      fs.writeFileSync(sshKeyPath, sshKey.replace(/\\n/g, '\n'), { mode: 0o600 });
+
+      // PHASE 1: Test SSH connectivity and basic setup
+      const phase1Success = await this.testPhase1Setup(readyVM.publicIp || 'unknown');
+      
+      if (!phase1Success) {
+        await this.actions.commentOnIssue(owner, repo, issue.number, 
+          `❌ **Phase 1 Failed - Basic VM Setup Issues**
+          
+**What Failed:**
+- SSH connectivity test failed
+- Basic cloud-config may not have executed properly
+- Cannot proceed to Ansible setup
+
+**Next Steps:**
+- Check cloud-config syntax and execution
+- Verify SSH key embedding in cloud-config
+- Debug basic VM initialization
+
+*VM available for manual debugging at ${readyVM.publicIp}*`);
+        
+        await this.actions.addLabel(owner, repo, issue.number, 'billy-phase1-failed');
+        return;
+      }
+
+      // PHASE 1 SUCCESS - Proceed to Ansible
+      await this.actions.commentOnIssue(owner, repo, issue.number, 
+        `✅ **Phase 1 Success - Starting Ansible Setup!**
+        
+**Phase 1 Results:**
+- ✅ SSH connectivity working
+- ✅ Basic cloud-config executed successfully  
+- ✅ Web server accessible on port 8080
+
+**Phase 2 Starting:**
+- 🔧 Running Ansible playbook for desktop environment
+- 📦 Installing GUI packages (xvfb, fluxbox, x11vnc, firefox)
+- 🖥️  Setting up VNC access
+- 📁 Cloning GiveGrove repository
 
 *Executing ansible/claude-code-environment.yml...*`);
 
@@ -354,6 +402,74 @@ Please check the configuration and try again.
     }
   }
 
+  // PHASE 1: Test basic VM setup before proceeding to Ansible
+  private async testPhase1Setup(vmIp: string): Promise<boolean> {
+    try {
+      console.log(`🔍 Testing Phase 1 setup on VM ${vmIp}`);
+      
+      const { spawn } = require('child_process');
+      
+      // Test 1: SSH connectivity
+      console.log(`🔑 Testing SSH connectivity to ${vmIp}`);
+      const sshTest = await new Promise<boolean>((resolve) => {
+        const sshProcess = spawn('ssh', [
+          '-i', '/tmp/ssh_key',
+          '-o', 'StrictHostKeyChecking=no',
+          '-o', 'ConnectTimeout=10',
+          `ubuntu@${vmIp}`,
+          'whoami'
+        ], { stdio: 'pipe' });
+
+        let output = '';
+        sshProcess.stdout.on('data', (data: Buffer) => {
+          output += data.toString();
+        });
+
+        sshProcess.on('close', (code: number) => {
+          const success = code === 0 && output.trim() === 'ubuntu';
+          console.log(`🔑 SSH test result: ${success ? 'SUCCESS' : 'FAILED'} (code: ${code}, output: "${output.trim()}")`);
+          resolve(success);
+        });
+
+        setTimeout(() => {
+          sshProcess.kill();
+          console.log(`🔑 SSH test timed out`);
+          resolve(false);
+        }, 15000);
+      });
+
+      if (!sshTest) {
+        console.log(`❌ SSH connectivity failed for ${vmIp}`);
+        return false;
+      }
+
+      // Test 2: Web server accessibility (indicates cloud-config worked)
+      console.log(`🌐 Testing web server accessibility on ${vmIp}:8080`);
+      const axios = require('axios');
+      
+      try {
+        const response = await axios.get(`http://${vmIp}:8080/billy-basic-setup.log`, {
+          timeout: 10000
+        });
+        
+        if (response.status === 200 && response.data.includes('Basic setup completed')) {
+          console.log(`✅ Web server accessible and cloud-config completed successfully`);
+          return true;
+        } else {
+          console.log(`⚠️ Web server accessible but setup may be incomplete`);
+          return false;
+        }
+      } catch (error) {
+        console.log(`❌ Web server not accessible: ${error}`);
+        return false;
+      }
+
+    } catch (error) {
+      console.error(`❌ Phase 1 setup test failed: ${error}`);
+      return false;
+    }
+  }
+
   // Run Ansible playbook on the VM from Railway container
   private async runAnsiblePlaybook(vmIp: string, owner: string, repo: string, playbookPath: string): Promise<boolean> {
     try {
@@ -404,14 +520,8 @@ ansible_ssh_common_args='-o StrictHostKeyChecking=no'`;
       
       fs.writeFileSync(inventoryPath, inventoryContent);
       
-      // Create SSH key file from environment variable
+      // SSH key already created in VM workflow Phase 1 testing
       const sshKeyPath = '/tmp/ssh_key';
-      const sshKey = process.env.SSH_PRIVATE_KEY || '';
-      if (!sshKey) {
-        throw new Error('SSH_PRIVATE_KEY environment variable not found');
-      }
-      
-      fs.writeFileSync(sshKeyPath, sshKey.replace(/\\n/g, '\n'), { mode: 0o600 });
       
       // Run ansible-playbook
       const playbookFullPath = path.join(ansiblePath, playbookPath.replace('ansible/', ''));
@@ -476,15 +586,9 @@ ansible_ssh_common_args='-o StrictHostKeyChecking=no'`;
     }
   }
 
-  // Generate VM setup with SSH key directly in cloud-config
-  // CRITICAL: This approach was learned through painful debugging - see CLAUDE.md for details
-  // FIXED: Avoid template variables that break YAML parsing
+  // PHASE 1: Minimal cloud-config - ONLY SSH keys + basic packages
+  // Everything else moved to Ansible for better error reporting
   private generateVMSetupScript(owner: string, repo: string, playbookPath: string, issue: any): string {
-    const githubToken = process.env.GITHUB_TOKEN || '';
-    const issueNum = issue.number.toString();
-    const repoOwner = owner.replace(/[^a-zA-Z0-9-]/g, '');
-    const repoName = repo.replace(/[^a-zA-Z0-9-]/g, '');
-    
     return `#cloud-config
 users:
   - name: ubuntu
@@ -497,48 +601,15 @@ packages:
   - git
   - curl
   - wget
-  - build-essential
-  - python3-pip
-  - xvfb
-  - fluxbox
-  - x11vnc
-  - firefox
-
-write_files:
-  - path: /tmp/github_token
-    content: ${githubToken}
-    permissions: '0600'
-    owner: ubuntu:ubuntu
 
 runcmd:
-  - echo "Billy VM AUTOMATION TEST - started at $(date)" > /var/log/billy-status.log
-  - echo "SSH key installed via cloud-config" >> /var/log/billy-status.log
-  - echo "Issue ${issueNum} processed" >> /var/log/billy-status.log
-  - echo "Repository ${repoOwner}/${repoName}" >> /var/log/billy-status.log
-  - echo "Installing GUI environment and browser..." >> /var/log/billy-status.log
+  - echo "Billy VM Phase 1 - Basic Setup Started at $(date)" > /var/log/billy-basic-setup.log
+  - echo "SSH key installed successfully" >> /var/log/billy-basic-setup.log
+  - echo "Basic packages installed" >> /var/log/billy-basic-setup.log
   - cd /var/log && python3 -m http.server 8080 &
-  - mkdir -p /home/ubuntu/logs
-  - chown ubuntu:ubuntu /home/ubuntu/logs
-  - chmod 755 /home/ubuntu/logs
-  - echo "Starting desktop environment..." >> /var/log/billy-status.log
-  - sudo -u ubuntu DISPLAY=:99 Xvfb :99 -screen 0 1920x1080x24 >/home/ubuntu/logs/xvfb.log 2>&1 &
-  - sleep 3
-  - sudo -u ubuntu DISPLAY=:99 fluxbox >/home/ubuntu/logs/fluxbox.log 2>&1 &
-  - sleep 2
-  - sudo -u ubuntu DISPLAY=:99 x11vnc -display :99 -forever -shared -bg -nopw -xkb -listen 0.0.0.0 -rfbport 5900 >/home/ubuntu/logs/vnc.log 2>&1 &
-  - sleep 3
-  - echo "Validating desktop services..." >> /var/log/billy-status.log
-  - if pgrep Xvfb > /dev/null; then echo "✅ Xvfb running" >> /var/log/billy-status.log; else echo "❌ Xvfb FAILED" >> /var/log/billy-status.log; fi
-  - if pgrep fluxbox > /dev/null; then echo "✅ fluxbox running" >> /var/log/billy-status.log; else echo "❌ fluxbox FAILED" >> /var/log/billy-status.log; fi
-  - if pgrep x11vnc > /dev/null; then echo "✅ x11vnc running" >> /var/log/billy-status.log; else echo "❌ x11vnc FAILED" >> /var/log/billy-status.log; fi
-  - if ss -tlnp | grep :5900 > /dev/null; then echo "✅ VNC port 5900 open" >> /var/log/billy-status.log; else echo "❌ VNC port 5900 FAILED" >> /var/log/billy-status.log; fi
-  - echo "Cloning GiveGrove repository..." >> /var/log/billy-status.log
-  - TOKEN=$(cat /tmp/github_token)
-  - if sudo -u ubuntu git clone https://\${TOKEN}@github.com/${repoOwner}/${repoName}.git /home/ubuntu/GiveGrove; then echo "✅ GiveGrove cloned successfully" >> /var/log/billy-status.log; else echo "❌ GiveGrove clone FAILED" >> /var/log/billy-status.log; fi
-  - if [ -d "/home/ubuntu/GiveGrove" ]; then echo "✅ GiveGrove directory exists" >> /var/log/billy-status.log; else echo "❌ GiveGrove directory MISSING" >> /var/log/billy-status.log; fi
-  - rm -f /tmp/github_token
-  - echo "VM is ready for Ansible execution from Railway" >> /var/log/billy-status.log
-  - echo "Billy VM automation validation completed at $(date)" >> /var/log/billy-status.log
+  - echo "Web server started on port 8080" >> /var/log/billy-basic-setup.log
+  - echo "VM ready for SSH access and Ansible execution" >> /var/log/billy-basic-setup.log
+  - echo "Basic setup completed at $(date)" >> /var/log/billy-basic-setup.log
 `;
   }
 

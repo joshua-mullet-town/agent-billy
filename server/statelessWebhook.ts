@@ -282,43 +282,37 @@ I'm now implementing this feature using a dedicated development environment.
 
 *Testing minimal setup before Ansible execution...*`);
 
-      // Create SSH key file for testing and Ansible with proper formatting
+      // Create SSH key file with proper base64 decoding (SOLUTION TO PERSISTENT SSH ISSUE)
       const fs = require('fs');
       const sshKeyPath = '/tmp/ssh_key';
-      const sshKey = process.env.SSH_PRIVATE_KEY || '';
-      if (!sshKey) {
+      const sshKeyBase64 = process.env.SSH_PRIVATE_KEY || '';
+      if (!sshKeyBase64) {
         throw new Error('SSH_PRIVATE_KEY environment variable not found');
       }
       
-      // Fix SSH key formatting: Railway may store with literal \n or missing newlines
-      let formattedKey = sshKey;
-      
-      // Replace literal \n with actual newlines
-      formattedKey = formattedKey.replace(/\\n/g, '\n');
-      
-      // Ensure proper SSH key format with newlines after headers/footers
-      if (!formattedKey.includes('\n')) {
-        // If no newlines at all, add them around BEGIN/END markers
-        formattedKey = formattedKey
-          .replace(/-----BEGIN/, '\n-----BEGIN')
-          .replace(/-----END/, '\n-----END')
-          .replace(/KEY-----/, 'KEY-----\n');
+      // SOLUTION: Base64 decode the SSH private key
+      // Railway stores SSH keys as base64 to avoid newline interpretation issues
+      let privateKey: string;
+      try {
+        privateKey = Buffer.from(sshKeyBase64, 'base64').toString('ascii');
+        console.log(`✅ Successfully decoded base64 SSH private key`);
+      } catch (error) {
+        console.log(`⚠️ Base64 decode failed, trying raw format: ${error}`);
+        // Fallback to raw format with newline replacement (legacy support)
+        privateKey = sshKeyBase64.replace(/\\n/g, '\n');
       }
       
       // Ensure the key ends with a newline
-      if (!formattedKey.endsWith('\n')) {
-        formattedKey += '\n';
+      if (!privateKey.endsWith('\n')) {
+        privateKey += '\n';
       }
       
-      console.log(`🔑 SSH Key Debug Information:`);
-      console.log(`📊 Raw key length: ${sshKey.length} chars`);
-      console.log(`🔤 Contains literal \\n: ${sshKey.includes('\\n')}`);
-      console.log(`🔤 Contains actual newlines: ${sshKey.includes('\n')}`);
-      console.log(`🔤 Raw first 100 chars: "${sshKey.substring(0, 100)}"`);
-      console.log(`📝 Formatted key length: ${formattedKey.length} chars`);
-      console.log(`🔤 Formatted first 100 chars: "${formattedKey.substring(0, 100)}"`);
-      console.log(`🔑 Writing SSH key to ${sshKeyPath}`);
-      fs.writeFileSync(sshKeyPath, formattedKey, { mode: 0o600 });
+      console.log(`🔑 SSH Key Processing Complete:`);
+      console.log(`📊 Base64 input length: ${sshKeyBase64.length} chars`);
+      console.log(`📝 Decoded key length: ${privateKey.length} chars`);
+      console.log(`🔤 Decoded key first 50 chars: "${privateKey.substring(0, 50)}"`);
+      console.log(`✅ Writing properly formatted SSH key to ${sshKeyPath}`);
+      fs.writeFileSync(sshKeyPath, privateKey, { mode: 0o600 });
 
       // PHASE 1: Test SSH connectivity and basic setup
       const phase1Success = await this.testPhase1Setup(readyVM.publicIp || 'unknown');

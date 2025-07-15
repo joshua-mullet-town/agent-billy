@@ -664,18 +664,16 @@ packages:
   - build-essential
 
 runcmd:
-  - echo "Billy VM Phase 1 - Enhanced Setup Started at $(date)" > /var/log/billy-basic-setup.log
-  - echo "SSH key installed successfully" >> /var/log/billy-basic-setup.log
-  - echo "Basic packages installed" >> /var/log/billy-basic-setup.log
-  - echo "Installing Node.js 20 LTS..." >> /var/log/billy-basic-setup.log
+  - echo "Billy VM Phase 1 - Enhanced Setup Started" > /var/log/billy-enhanced-setup.log
+  - echo "SSH key installed successfully" >> /var/log/billy-enhanced-setup.log
+  - echo "Basic packages installed" >> /var/log/billy-enhanced-setup.log
+  - echo "Installing Node.js 20 LTS..." >> /var/log/billy-enhanced-setup.log
   - curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
   - apt-get install -y nodejs
-  - echo "Node.js version: $(node --version)" >> /var/log/billy-basic-setup.log
-  - echo "npm version: $(npm --version)" >> /var/log/billy-basic-setup.log
   - cd /var/log && python3 -m http.server 8080 &
-  - echo "Web server started on port 8080" >> /var/log/billy-basic-setup.log
-  - echo "VM ready for SSH access and Ansible execution" >> /var/log/billy-basic-setup.log
-  - echo "Enhanced setup completed at $(date)" >> /var/log/billy-basic-setup.log
+  - echo "Web server started on port 8080" >> /var/log/billy-enhanced-setup.log
+  - echo "VM ready for SSH access and Ansible execution" >> /var/log/billy-enhanced-setup.log
+  - echo "Enhanced setup completed" >> /var/log/billy-enhanced-setup.log
 `;
   }
 

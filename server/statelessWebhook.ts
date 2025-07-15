@@ -217,6 +217,10 @@ I'm now implementing this feature using a dedicated development environment.
       // Initialize VM orchestrator
       const vmOrchestrator = new VMOrchestrator();
       
+      // Clean up old VMs first to avoid cost accumulation
+      console.log(`🧹 Cleaning up old VMs before creating new one...`);
+      await vmOrchestrator.destroyOldVMs('159.203.123.65'); // Keep current working VM
+      
       // Generate unique VM name
       const vmName = `billy-${repo}-${issue.number}-${Date.now()}`.toLowerCase().replace(/[^a-z0-9-]/g, '-');
       
@@ -257,21 +261,62 @@ I'm now implementing this feature using a dedicated development environment.
       
       // Update with ready status
       await this.actions.commentOnIssue(owner, repo, issue.number, 
-        `🎉 **VM Ready for Development!**
+        `🎉 **VM Ready - Starting Ansible Playbook!**
         
 **VM Status:**
 - ✅ VM is running
 - ✅ Public IP: ${readyVM.publicIp}
-- ✅ Environment setup in progress
+- ✅ Basic setup completed
 
 **Next Phase:**
-- Ansible playbook execution
-- Claude Code CLI installation
-- Autonomous development begins
+- 🔧 Running Ansible playbook for full dev environment
+- 📦 Installing Node.js, npm, Firebase CLI
+- 🎭 Setting up Claude Code CLI + Playwright MCP
+- 🖥️  Configuring GUI environment with VNC
 
-*VM development environment is now active*`);
+*Executing ansible/claude-code-environment.yml...*`);
 
-      await this.actions.addLabel(owner, repo, issue.number, 'billy-vm-active');
+      // Run Ansible playbook to setup complete development environment
+      const ansibleSuccess = await this.runAnsiblePlaybook(readyVM.publicIp || 'unknown', owner, repo, playbookPath);
+      
+      if (ansibleSuccess) {
+        await this.actions.commentOnIssue(owner, repo, issue.number, 
+          `✅ **Development Environment Ready!**
+          
+**Environment Status:**
+- ✅ VM provisioned and configured
+- ✅ Node.js, npm, Firebase CLI installed
+- ✅ Claude Code CLI + Playwright MCP configured
+- ✅ GUI environment with VNC ready
+- ✅ GiveGrove repository cloned and built
+
+**Ready for Development:**
+- 🌐 Frontend: http://${readyVM.publicIp}:3000
+- 🔧 Backend: http://${readyVM.publicIp}:4000
+- 🖥️  VNC Access: ${readyVM.publicIp}:5900
+
+Billy is now ready to execute development tasks autonomously!`);
+
+        await this.actions.addLabel(owner, repo, issue.number, 'billy-vm-ready');
+      } else {
+        await this.actions.commentOnIssue(owner, repo, issue.number, 
+          `⚠️ **VM Created but Ansible Setup Failed**
+          
+**VM Status:**
+- ✅ VM is running at ${readyVM.publicIp}
+- ❌ Ansible playbook execution failed
+- ⚠️ Development environment incomplete
+
+**Next Steps:**
+- Check Ansible playbook logs
+- Verify repository configuration
+- Manual setup may be required
+
+*VM available for debugging at ${readyVM.publicIp}*`);
+
+        await this.actions.addLabel(owner, repo, issue.number, 'billy-vm-partial');
+      }
+
       await this.actions.removeLabel(owner, repo, issue.number, 'for-billy');
       
       console.log(`✅ VM workflow initiated for issue #${issue.number}, VM ID: ${vm.id}`);
@@ -302,6 +347,128 @@ Please check the configuration and try again.
     }
   }
 
+  // Run Ansible playbook on the VM from Railway container
+  private async runAnsiblePlaybook(vmIp: string, owner: string, repo: string, playbookPath: string): Promise<boolean> {
+    try {
+      console.log(`🔧 Running Ansible playbook on VM ${vmIp}`);
+      
+      const fs = require('fs');
+      const path = require('path');
+      const { spawn } = require('child_process');
+      
+      // Create temporary directory for ansible work
+      const tempDir = `/tmp/ansible-${Date.now()}`;
+      fs.mkdirSync(tempDir, { recursive: true });
+      
+      // Clone the target repository to access ansible playbook
+      console.log(`📋 Cloning ${owner}/${repo} to access ansible playbook`);
+      const githubToken = process.env.GITHUB_TOKEN || '';
+      if (!githubToken) {
+        throw new Error('GITHUB_TOKEN environment variable is required for repository access');
+      }
+      
+      const cloneProcess = spawn('git', ['clone', `https://x-access-token:${githubToken}@github.com/${owner}/${repo}.git`, 'repo'], {
+        cwd: tempDir,
+        stdio: 'pipe'
+      });
+      
+      await new Promise((resolve, reject) => {
+        cloneProcess.on('close', (code: number) => {
+          if (code === 0) {
+            console.log(`✅ Repository cloned successfully`);
+            resolve(true);
+          } else {
+            console.error(`❌ Failed to clone repository, exit code: ${code}`);
+            reject(new Error(`Git clone failed with code ${code}`));
+          }
+        });
+      });
+      
+      const repoPath = path.join(tempDir, 'repo');
+      const ansiblePath = path.join(repoPath, 'ansible');
+      
+      // Create dynamic inventory file with the VM IP
+      const inventoryPath = path.join(ansiblePath, 'dynamic_inventory.yml');
+      const inventoryContent = `[vm_instance]
+${vmIp} ansible_user=ubuntu ansible_ssh_private_key_file=/tmp/ssh_key vm_ip=${vmIp}
+
+[vm_instance:vars]
+ansible_ssh_common_args='-o StrictHostKeyChecking=no'`;
+      
+      fs.writeFileSync(inventoryPath, inventoryContent);
+      
+      // Create SSH key file from environment variable
+      const sshKeyPath = '/tmp/ssh_key';
+      const sshKey = process.env.SSH_PRIVATE_KEY || '';
+      if (!sshKey) {
+        throw new Error('SSH_PRIVATE_KEY environment variable not found');
+      }
+      
+      fs.writeFileSync(sshKeyPath, sshKey.replace(/\\n/g, '\n'), { mode: 0o600 });
+      
+      // Run ansible-playbook
+      const playbookFullPath = path.join(ansiblePath, playbookPath.replace('ansible/', ''));
+      
+      return new Promise((resolve) => {
+        const ansibleProcess = spawn('ansible-playbook', [
+          playbookFullPath,
+          '-i', inventoryPath,
+          '-e', `vm_ip=${vmIp}`,
+          '--timeout', '1800',  // 30 minute timeout
+          '-v'
+        ], {
+          cwd: ansiblePath,
+          stdio: 'pipe'
+        });
+        
+        let output = '';
+        let errorOutput = '';
+        
+        ansibleProcess.stdout.on('data', (data: Buffer) => {
+          const text = data.toString();
+          output += text;
+          console.log(`Ansible stdout: ${text}`);
+        });
+        
+        ansibleProcess.stderr.on('data', (data: Buffer) => {
+          const text = data.toString();
+          errorOutput += text;
+          console.log(`Ansible stderr: ${text}`);
+        });
+        
+        ansibleProcess.on('close', (code: number) => {
+          console.log(`Ansible process exited with code ${code}`);
+          console.log(`Full output: ${output}`);
+          
+          // Cleanup
+          try {
+            fs.rmSync(tempDir, { recursive: true, force: true });
+            fs.rmSync(sshKeyPath, { force: true });
+          } catch (cleanupError) {
+            console.warn(`Warning: Failed to cleanup temporary files: ${cleanupError}`);
+          }
+          
+          if (code === 0) {
+            console.log(`✅ Ansible playbook completed successfully on VM ${vmIp}`);
+            resolve(true);
+          } else {
+            console.error(`❌ Ansible playbook failed on VM ${vmIp}. Exit code: ${code}`);
+            console.error(`Error output: ${errorOutput}`);
+            resolve(false);
+          }
+        });
+        
+        ansibleProcess.on('error', (error: Error) => {
+          console.error(`❌ Failed to start Ansible process: ${error.message}`);
+          resolve(false);
+        });
+      });
+    } catch (error) {
+      console.error('❌ Failed to run Ansible playbook:', error);
+      return false;
+    }
+  }
+
   // Generate VM setup with SSH key directly in cloud-config
   // CRITICAL: This approach was learned through painful debugging - see CLAUDE.md for details
   private generateVMSetupScript(owner: string, repo: string, playbookPath: string, issue: any): string {
@@ -314,16 +481,19 @@ users:
 
 packages:
   - python3
+  - git
+  - curl
+  - wget
+  - build-essential
+  - python3-pip
 
 runcmd:
-  - echo "Billy VM cloud-init started at $(date)" > /var/log/billy-status.log
+  - echo "Billy VM Phase 3 Development Environment Setup started at $(date)" > /var/log/billy-status.log
   - echo "SSH key installed via cloud-config" >> /var/log/billy-status.log
   - echo "Issue ${issue.number} processed" >> /var/log/billy-status.log
   - echo "Repository ${owner}/${repo}" >> /var/log/billy-status.log
-  - echo "Starting web server..." >> /var/log/billy-status.log
-  - cd /var/log && python3 -m http.server 8080 &
-  - echo "Web server started - cloud-init working!" >> /var/log/billy-status.log
-  - echo "Billy VM setup completed at $(date)" >> /var/log/billy-status.log
+  - echo "VM is ready for Ansible execution from Railway" >> /var/log/billy-status.log
+  - echo "Billy VM Phase 3 setup completed at $(date)" >> /var/log/billy-status.log
 `;
   }
 

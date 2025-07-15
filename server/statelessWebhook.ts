@@ -323,12 +323,12 @@ I'm now implementing this feature using a dedicated development environment.
         console.log(`❌ Failed to verify SSH key file: ${error}`);
       }
 
-      // PHASE 1: Skip SSH test due to Railway platform SSH limitations
-      // Research shows Railway restricts outbound SSH connections from containers
-      console.log(`⚠️ Skipping SSH test due to Railway platform limitations`);
-      console.log(`✅ Infrastructure proven to work via manual testing`);
-      console.log(`🚀 Proceeding directly to Ansible execution`);
-      const phase1Success = true;
+      // PHASE 1: Wait for cloud-init completion instead of SSH test
+      // Billy waits for cloud-init to complete Node.js installation before Ansible
+      console.log(`⏳ Waiting for cloud-init to complete on VM ${readyVM.publicIp}`);
+      console.log(`🔍 Checking for enhanced setup completion...`);
+      
+      const phase1Success = await this.waitForCloudInitCompletion(readyVM.publicIp || '');
       
       if (!phase1Success) {
         await this.actions.commentOnIssue(owner, repo, issue.number, 
@@ -439,7 +439,53 @@ Please check the configuration and try again.
     }
   }
 
-  // PHASE 1: Test basic VM setup before proceeding to Ansible
+  // PHASE 1: Wait for cloud-init completion (replaces SSH test due to Railway limitations)
+  private async waitForCloudInitCompletion(vmIp: string): Promise<boolean> {
+    try {
+      console.log(`🔍 Waiting for cloud-init completion on VM ${vmIp}`);
+      
+      // Wait up to 10 minutes for cloud-init to complete
+      const maxAttempts = 30; // 30 attempts * 20 seconds = 10 minutes
+      
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        console.log(`📋 Attempt ${attempt}/${maxAttempts}: Checking cloud-init status...`);
+        
+        try {
+          // Check if web server is responding (indicates runcmd completed)
+          const response = await fetch(`http://${vmIp}:8080/billy-enhanced-setup.log`, {
+            method: 'GET',
+            signal: AbortSignal.timeout(10000) // 10 second timeout
+          });
+          
+          if (response.ok) {
+            const logContent = await response.text();
+            if (logContent.includes('Enhanced setup completed')) {
+              console.log(`✅ Cloud-init completed successfully on VM ${vmIp}`);
+              console.log(`📋 Setup log: ${logContent.substring(0, 200)}...`);
+              return true;
+            }
+          }
+        } catch (error) {
+          console.log(`📋 Attempt ${attempt}: Web server not ready yet (${error})`);
+        }
+        
+        // Wait 20 seconds before next attempt
+        if (attempt < maxAttempts) {
+          console.log(`⏳ Waiting 20 seconds before next check...`);
+          await new Promise(resolve => setTimeout(resolve, 20000));
+        }
+      }
+      
+      console.log(`❌ Cloud-init did not complete within 10 minutes on VM ${vmIp}`);
+      return false;
+      
+    } catch (error) {
+      console.error(`❌ Error waiting for cloud-init completion: ${error}`);
+      return false;
+    }
+  }
+
+  // PHASE 1: Test basic VM setup before proceeding to Ansible (LEGACY - replaced by waitForCloudInitCompletion)
   private async testPhase1Setup(vmIp: string): Promise<boolean> {
     try {
       console.log(`🔍 Testing Phase 1 setup on VM ${vmIp}`);

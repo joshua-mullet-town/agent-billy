@@ -87,6 +87,88 @@ ANTHROPIC_API_KEY=your_anthropic_key_here  # For Claude LLM
 DIGITALOCEAN_TOKEN=your_do_token_here      # For VM orchestration
 ```
 
+## SSH Key Configuration for VM Development Workflow
+
+### **CRITICAL: SSH Key Setup - HARD-LEARNED LESSONS**
+
+⚠️ **DO NOT use DigitalOcean's SSH key management API** - it's unreliable and causes authentication failures.
+
+✅ **ALWAYS embed SSH keys directly in cloud-config userData**
+
+**The Problem We Solved:**
+- DigitalOcean SSH key fingerprints (MD5/SHA256) don't work reliably in API calls
+- Template variables with quotes break YAML parsing in cloud-config
+- VMs get created successfully but SSH access fails silently
+
+**Working Solution:**
+```typescript
+// In generateVMSetupScript() method
+const userData = `#cloud-config
+users:
+  - name: ubuntu
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICOWn4+jHkJv1qZnX++HA26lDCeKzHAP1UFJkMIxjHAl joshuamullet@Joshuas-MacBook-Air.local
+    sudo: ALL=(ALL) NOPASSWD:ALL
+
+packages:
+  - python3
+
+runcmd:
+  - echo "Billy VM setup started at $(date)" > /var/log/billy-status.log
+  - echo "SSH key installed via cloud-config" >> /var/log/billy-status.log
+  - cd /var/log && python3 -m http.server 8080 &
+  - echo "Setup completed at $(date)" >> /var/log/billy-status.log`;
+
+// VM creation - leave sshKeys empty
+const vm = await vmOrchestrator.createVM({
+  name: vmName,
+  region: 'nyc3',
+  size: vmSize,
+  image: 'ubuntu-22-04-x64',
+  sshKeys: [], // CRITICAL: Leave empty - SSH key handled via cloud-config
+  userData: userData
+});
+```
+
+**SSH Key Testing Process:**
+```bash
+# Test SSH access
+ssh -i ~/.ssh/id_ed25519_digital_ocean ubuntu@VM_IP "whoami"
+
+# Debug SSH connection
+ssh -v -i ~/.ssh/id_ed25519_digital_ocean ubuntu@VM_IP
+
+# Check cloud-init execution
+ssh -i ~/.ssh/id_ed25519_digital_ocean ubuntu@VM_IP "sudo tail -20 /var/log/cloud-init.log"
+
+# Verify setup via web server
+curl http://VM_IP:8080/billy-status.log
+```
+
+**Common SSH Failures & Solutions:**
+1. **Permission denied (publickey)**: SSH key not in cloud-config users section
+2. **Cloud-init parsing error**: Template variables with quotes break YAML
+3. **VM created but no services**: runcmd section failed due to syntax errors
+4. **Connection refused**: Web server not started due to cloud-init failures
+
+**Template Variable Escaping Rules:**
+- ❌ Bad: `echo "Issue: ${issue.title}"` (quotes in title break YAML)
+- ❌ Bad: `echo "User: ${user.name}"` (special chars break parsing)
+- ✅ Good: `echo "Issue ${issue.number} processed"` (no problematic quotes)
+- ✅ Good: `echo "Repository ${owner}/${repo}"` (safe variable content)
+
+**Debugging Cloud-init Failures:**
+```bash
+# Check cloud-init logs for parsing errors
+sudo grep -A 10 -B 10 'runcmd' /var/log/cloud-init.log
+
+# Look for YAML parsing failures
+sudo grep -i 'error\|fail' /var/log/cloud-init.log
+
+# Check if specific commands failed
+sudo grep -A 5 -B 5 'shellify' /var/log/cloud-init.log
+```
+
 ## Current Workflow Types
 
 Billy supports configurable implementation workflows:
@@ -185,3 +267,106 @@ This structure ensures you have full context and clarity about our progress, res
 - When completing tasks, update both TODO.md and any affected documentation
 
 This ensures continuity across sessions and helps other coding agents understand our progress and direction.
+
+## Engineering Standards & Philosophy
+
+### No Shortcuts or Work-Arounds
+**CRITICAL PRINCIPLE:** We are building a production-quality system that must work end-to-end reliably. This means:
+
+#### Always Diagnose Root Causes
+- **Never accept surface-level fixes** - If something appears to work but we don't understand why, keep digging
+- **Never work around problems** - If authentication fails, fix authentication. Don't bypass it with test requests
+- **Never assume things are working** - Verify every step of the flow actually works as designed
+
+#### End-to-End Testing Requirements
+When testing Billy's functionality:
+1. **Real webhook delivery** - GitHub must actually send webhooks to Railway
+2. **Real authentication** - Billy must authenticate with GitHub APIs using proper GitHub App credentials  
+3. **Real issue processing** - Billy must read actual issue content and comments from GitHub
+4. **Real LLM analysis** - Billy must make actual decisions about clarification vs. implementation
+5. **Real workflow execution** - Billy must trigger actual GitHub Actions or VM workflows
+6. **Real results** - The complete flow must produce actual comments, PRs, or implementations
+
+#### When Systems Are Down or Broken
+- **Diagnose the actual problem** - Don't guess, investigate logs, API responses, and error messages
+- **Fix the underlying issue** - Update credentials, fix configurations, restart services as needed
+- **Verify the fix works** - Test the complete flow after every fix
+- **Document what was broken** - Update SETUP.md or add troubleshooting notes
+
+#### Forbidden Practices
+- ❌ Simulating webhooks with curl when real webhooks should work
+- ❌ Using test requests to bypass authentication problems  
+- ❌ Assuming deployment worked without checking logs
+- ❌ Working around timeouts instead of fixing connection issues
+- ❌ Partial testing that skips steps in the real flow
+
+### Debugging Standards
+When something isn't working:
+1. **Check Railway logs for actual errors** - If logs are timing out, that's a problem to fix
+2. **Verify GitHub App permissions and installation** - Ensure Billy has access to target repositories
+3. **Test authentication independently** - Verify JWT token generation and API access work
+4. **Trace the complete request flow** - Follow webhooks from GitHub → Railway → Billy → back to GitHub
+5. **Fix problems completely** - Don't move forward until each step actually works
+
+### Success Criteria
+Billy is only "working" when:
+- Real GitHub webhooks trigger real processing in Railway
+- Billy successfully authenticates and reads from GitHub APIs
+- Billy makes intelligent clarification vs. implementation decisions
+- Billy successfully triggers and completes configured workflows
+- The entire flow produces real, useful results for users
+
+This philosophy ensures we build something genuinely reliable rather than something that appears to work under ideal conditions.
+
+## MANDATORY Session Management System
+
+### CRITICAL REQUIREMENT: Every substantive response MUST include session management
+
+**Reading Requirement:** Always start by reading SESSION.md if it exists to understand current momentum and context.
+
+**Update Requirement:** Always end substantive responses by updating SESSION.md with current progress.
+
+**Working Cadence:** Every response must follow this structure:
+1. **What We Just Did** - Specific recent accomplishments/discoveries
+2. **What We're Doing Next** - Current exact task 
+3. **Your Part** - What the user needs to do/decide/provide
+4. **My Part** - What I'm handling in the next steps
+
+### SESSION.md Template (MANDATORY):
+```markdown
+# Session [DATE] Context
+
+## Just Completed (Last 1-3 actions)
+- [Specific thing we just proved/fixed/built with concrete results]
+- [Recent discovery or breakthrough]
+- [System state change or deployment]
+
+## Current Task 
+[Exact thing we're working on right now - be specific]
+
+## Next 3 Actions
+1. [Immediate next step with clear success criteria]
+2. [Following step that depends on #1]
+3. [Step after that to maintain momentum]
+
+## Your Role
+[What the user needs to do, decide, provide, or approve]
+
+## My Role  
+[What I'm actively handling in the next steps]
+
+## System State
+[Current deployment status, what's working, what's broken, key URLs/credentials]
+
+## Context Preservation
+[Critical momentum items that must not be lost in handoffs]
+```
+
+### Enforcement Rules:
+- **Never skip SESSION.md updates** - This is how we maintain continuity across context compactions
+- **Be specific** - "Fixed authentication" is bad, "Updated GitHub App installation ID to 75797595, now Billy can read config files" is good  
+- **Include concrete next steps** - Vague plans break momentum
+- **Update after every major step** - Don't batch updates
+- **Template compliance required** - Fill out every section or you're not following protocols
+
+This system ensures continuous momentum and context preservation across all agent handoffs and context compactions.

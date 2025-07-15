@@ -502,7 +502,7 @@ packages:
   - firefox
 
 runcmd:
-  - echo "Billy VM AUTOMATION FIXED - started at $(date)" > /var/log/billy-status.log
+  - echo "Billy VM AUTOMATION TEST - started at $(date)" > /var/log/billy-status.log
   - echo "SSH key installed via cloud-config" >> /var/log/billy-status.log
   - echo "Issue ${issue.number} processed" >> /var/log/billy-status.log
   - echo "Repository ${owner}/${repo}" >> /var/log/billy-status.log
@@ -511,18 +511,22 @@ runcmd:
   - chown ubuntu:ubuntu /home/ubuntu/logs
   - chmod 755 /home/ubuntu/logs
   - echo "Starting desktop environment..." >> /var/log/billy-status.log
-  - sudo -u ubuntu DISPLAY=:99 nohup Xvfb :99 -screen 0 1920x1080x24 >/home/ubuntu/logs/xvfb.log 2>&1 &
+  - sudo -u ubuntu DISPLAY=:99 Xvfb :99 -screen 0 1920x1080x24 >/home/ubuntu/logs/xvfb.log 2>&1 &
   - sleep 3
-  - sudo -u ubuntu DISPLAY=:99 nohup fluxbox >/home/ubuntu/logs/fluxbox.log 2>&1 &
+  - sudo -u ubuntu DISPLAY=:99 fluxbox >/home/ubuntu/logs/fluxbox.log 2>&1 &
   - sleep 2
-  - sudo -u ubuntu DISPLAY=:99 nohup x11vnc -display :99 -forever -shared -bg -nopw -xkb -listen 0.0.0.0 -rfbport 5900 >/home/ubuntu/logs/vnc.log 2>&1 &
-  - sleep 2
-  - echo "Desktop environment ready - VNC accessible on port 5900" >> /var/log/billy-status.log
+  - sudo -u ubuntu DISPLAY=:99 x11vnc -display :99 -forever -shared -bg -nopw -xkb -listen 0.0.0.0 -rfbport 5900 >/home/ubuntu/logs/vnc.log 2>&1 &
+  - sleep 3
+  - echo "Validating desktop services..." >> /var/log/billy-status.log
+  - if pgrep Xvfb > /dev/null; then echo "✅ Xvfb running" >> /var/log/billy-status.log; else echo "❌ Xvfb FAILED" >> /var/log/billy-status.log; fi
+  - if pgrep fluxbox > /dev/null; then echo "✅ fluxbox running" >> /var/log/billy-status.log; else echo "❌ fluxbox FAILED" >> /var/log/billy-status.log; fi
+  - if pgrep x11vnc > /dev/null; then echo "✅ x11vnc running" >> /var/log/billy-status.log; else echo "❌ x11vnc FAILED" >> /var/log/billy-status.log; fi
+  - if ss -tlnp | grep :5900 > /dev/null; then echo "✅ VNC port 5900 open" >> /var/log/billy-status.log; else echo "❌ VNC port 5900 FAILED" >> /var/log/billy-status.log; fi
   - echo "Cloning GiveGrove repository..." >> /var/log/billy-status.log
-  - sudo -u ubuntu git clone https://${githubToken}@github.com/${owner}/${repo}.git /home/ubuntu/GiveGrove
-  - echo "GiveGrove repository cloned successfully" >> /var/log/billy-status.log
+  - if sudo -u ubuntu git clone https://${githubToken}@github.com/${owner}/${repo}.git /home/ubuntu/GiveGrove; then echo "✅ GiveGrove cloned successfully" >> /var/log/billy-status.log; else echo "❌ GiveGrove clone FAILED" >> /var/log/billy-status.log; fi
+  - if [ -d "/home/ubuntu/GiveGrove" ]; then echo "✅ GiveGrove directory exists" >> /var/log/billy-status.log; else echo "❌ GiveGrove directory MISSING" >> /var/log/billy-status.log; fi
   - echo "VM is ready for Ansible execution from Railway" >> /var/log/billy-status.log
-  - echo "Billy VM Phase 3 setup completed at $(date)" >> /var/log/billy-status.log
+  - echo "Billy VM automation validation completed at $(date)" >> /var/log/billy-status.log
 `;
   }
 

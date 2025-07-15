@@ -495,7 +495,7 @@ packages:
   - firefox
 
 runcmd:
-  - echo "Billy VM Phase 3 Development Environment Setup started at $(date)" > /var/log/billy-status.log
+  - echo "Billy VM AUTOMATION FIXED - started at $(date)" > /var/log/billy-status.log
   - echo "SSH key installed via cloud-config" >> /var/log/billy-status.log
   - echo "Issue ${issue.number} processed" >> /var/log/billy-status.log
   - echo "Repository ${owner}/${repo}" >> /var/log/billy-status.log

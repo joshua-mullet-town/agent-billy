@@ -12,24 +12,28 @@ This tracks the big milestones from current webhook server to fully functional i
 - [x] **Clean foundation** - Lean codebase with proper documentation
 - [x] **Railway deployment** - Billy runs 24/7 as GitHub App webhook server
 
-## 🔄 In Progress
+## ✅ Completed
 
 ### Phase 2: Prove Out Implementation Flow
 - [x] **Billy declares "ready to implement"** - Billy now says he's ready and executes workflows
 - [x] **Create GitHub Action in target repo** - GiveGrove has `.github/workflows/billy.yml`
 - [x] **Billy triggers GitHub Action** - Billy can trigger `repository_dispatch` events  
-- [ ] **End-to-end test** - Full flow: issue → clarification → ready → action triggered
+- [x] **End-to-end test** - Full flow: issue → clarification → ready → action triggered
+- [x] **SSH Access Problem SOLVED** - After extensive debugging, documented working SSH key approach
 
-## 📋 Next Major Chunks
+## 🔄 In Progress
 
 ### Phase 3: VM Development Workflow
-- [ ] **Billy provisions DigitalOcean VM** - Prove Billy can actually create a VM via API
+- [x] **Billy provisions DigitalOcean VM** - ✅ WORKING - Billy creates VMs with SSH access via cloud-config
+- [x] **SSH Access to VMs** - ✅ WORKING - SSH keys embedded in cloud-config, documented in CLAUDE.md
 - [ ] **Billy runs target repo's Ansible** - VM gets set up using the repository's playbook  
 - [ ] **Claude Code CLI installed** - Verify Claude Code is working on the VM
 - [ ] **Playwright MCP integration** - Prove Playwright MCP is connected and functional
 - [ ] **Billy codes/tests autonomously** - Watch Billy actually implement/test the feature using Claude Code + Playwright MCP
 - [ ] **Billy creates working PR** - PR gets created back to target repo with working code
 - [ ] **VM cleanup** - Billy destroys the VM and cleans up resources
+
+## 📋 Next Major Chunks
 
 ### Phase 4: Polish & Scale  
 - [ ] **Multi-repository support** - Different repos can configure different Billy behaviors
@@ -39,16 +43,22 @@ This tracks the big milestones from current webhook server to fully functional i
 
 ## 🎯 Current Focus
 
-**Next Task:** Complete Phase 2 end-to-end test
+**Next Task:** Complete Phase 3 VM Development Environment Setup
 
 **What's Ready:** 
-- ✅ Billy configuration system (reads `.github/billy-config.yml`)
-- ✅ Billy workflow execution (declares ready and triggers GitHub Actions)
-- ✅ GiveGrove has GitHub Action ready to be triggered
-- ✅ Code deployed to Railway
+- ✅ Billy VM provisioning with SSH access (cloud-config approach)
+- ✅ SSH troubleshooting documented in CLAUDE.md
+- ✅ Working test VM: 159.203.123.65
+- ✅ Basic cloud-init execution (web server, status logs)
 
 **What We Need To Test:** 
-Create a clear, simple issue in GiveGrove and watch Billy execute the complete flow: analyze → declare ready → trigger GitHub Action → see the action respond
+1. **Full Development Environment**: Update cloud-config to install git, ansible, nodejs, npm
+2. **Repository Cloning**: Billy clones target repository in VM
+3. **Ansible Playbook**: Billy runs `ansible/claude-code-environment.yml` 
+4. **Claude Code CLI**: Install and verify Claude Code CLI + Playwright MCP
+5. **Autonomous Implementation**: Billy implements "Hello World" README change
+6. **PR Creation**: Billy creates working pull request
+7. **VM Cleanup**: Billy destroys VM after completion
 
 ## 📝 Notes & Discoveries
 
@@ -58,6 +68,10 @@ Create a clear, simple issue in GiveGrove and watch Billy execute the complete f
 - **User Focus:** TODO should track big chunks user cares about, not technical implementation details
 - **Phase 2 Implementation:** Billy now reads repository configuration, declares implementation readiness, and triggers GitHub Actions workflows
 - **Configuration System:** `.github/billy-config.yml` allows per-repository workflow customization
+- **CRITICAL SSH LESSON:** DigitalOcean SSH key management API is unreliable - always embed SSH keys directly in cloud-config `users` section
+- **YAML Template Variables:** Template variables with quotes (like issue titles) break YAML parsing - use safe variable content only
+- **VM Testing Approach:** Test SSH first, then cloud-init, then full workflow - don't create new VMs unnecessarily
+- **Cost Management:** Clean up old VMs after testing to avoid unnecessary DigitalOcean charges
 
 ---
 

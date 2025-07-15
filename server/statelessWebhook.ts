@@ -233,7 +233,7 @@ I'm now implementing this feature using a dedicated development environment.
       
       // Get VM config from repository config or use defaults
       const vmSize = config?.billy.vm_development?.vm_size || 's-2vcpu-2gb';
-      const playbookPath = config?.billy.vm_development?.ansible_playbook || 'ansible/claude-code-environment.yml';
+      const playbookPath = config?.billy.vm_development?.ansible_playbook || 'ansible/billy-development-environment.yml';
       
       console.log(`🔧 VM Config - Size: ${vmSize}, Playbook: ${playbookPath}`);
 

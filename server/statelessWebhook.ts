@@ -313,6 +313,14 @@ I'm now implementing this feature using a dedicated development environment.
       console.log(`🔤 Decoded key first 50 chars: "${privateKey.substring(0, 50)}"`);
       console.log(`✅ Writing properly formatted SSH key to ${sshKeyPath}`);
       fs.writeFileSync(sshKeyPath, privateKey, { mode: 0o600 });
+      
+      // Verify file creation and permissions
+      try {
+        const stats = fs.statSync(sshKeyPath);
+        console.log(`📁 SSH key file created successfully: ${stats.size} bytes, mode: ${stats.mode.toString(8)}`);
+      } catch (error) {
+        console.log(`❌ Failed to verify SSH key file: ${error}`);
+      }
 
       // PHASE 1: Test SSH connectivity and basic setup
       const phase1Success = await this.testPhase1Setup(readyVM.publicIp || 'unknown');
@@ -444,13 +452,21 @@ Please check the configuration and try again.
         ], { stdio: 'pipe' });
 
         let output = '';
+        let errorOutput = '';
+        
         sshProcess.stdout.on('data', (data: Buffer) => {
           output += data.toString();
+        });
+        
+        sshProcess.stderr.on('data', (data: Buffer) => {
+          errorOutput += data.toString();
         });
 
         sshProcess.on('close', (code: number) => {
           const success = code === 0 && output.trim() === 'ubuntu';
-          console.log(`🔑 SSH test result: ${success ? 'SUCCESS' : 'FAILED'} (code: ${code}, output: "${output.trim()}")`);
+          console.log(`🔑 SSH test result: ${success ? 'SUCCESS' : 'FAILED'} (code: ${code})`);
+          console.log(`📤 SSH stdout: "${output.trim()}"`);
+          console.log(`📤 SSH stderr: "${errorOutput.trim()}"`);
           resolve(success);
         });
 

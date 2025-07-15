@@ -580,6 +580,14 @@ ansible_ssh_common_args='-o StrictHostKeyChecking=no'`;
       
       fs.writeFileSync(inventoryPath, inventoryContent);
       
+      // Create vault password file for encrypted secrets
+      const vaultPasswordPath = path.join(ansiblePath, '.vault_pass');
+      const vaultPassword = process.env.ANSIBLE_VAULT_PASSWORD || '';
+      if (!vaultPassword) {
+        throw new Error('ANSIBLE_VAULT_PASSWORD environment variable is required for encrypted playbooks');
+      }
+      fs.writeFileSync(vaultPasswordPath, vaultPassword);
+      
       // SSH key already created in VM workflow Phase 1 testing
       const sshKeyPath = '/tmp/ssh_key';
       
@@ -591,6 +599,7 @@ ansible_ssh_common_args='-o StrictHostKeyChecking=no'`;
           playbookFullPath,
           '-i', inventoryPath,
           '-e', `vm_ip=${vmIp}`,
+          '--vault-password-file', '.vault_pass',  // Use vault password for encrypted secrets
           '--timeout', '1800',  // 30 minute timeout
           '-v'
         ], {

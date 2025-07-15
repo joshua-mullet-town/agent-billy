@@ -472,6 +472,8 @@ ansible_ssh_common_args='-o StrictHostKeyChecking=no'`;
   // Generate VM setup with SSH key directly in cloud-config
   // CRITICAL: This approach was learned through painful debugging - see CLAUDE.md for details
   private generateVMSetupScript(owner: string, repo: string, playbookPath: string, issue: any): string {
+    const githubToken = process.env.GITHUB_TOKEN || '';
+    
     return `#cloud-config
 users:
   - name: ubuntu
@@ -500,6 +502,7 @@ runcmd:
   - mkdir -p /home/ubuntu/logs
   - chown ubuntu:ubuntu /home/ubuntu/logs
   - chmod 755 /home/ubuntu/logs
+  - echo "Starting desktop environment..." >> /var/log/billy-status.log
   - sudo -u ubuntu DISPLAY=:99 nohup Xvfb :99 -screen 0 1920x1080x24 >/home/ubuntu/logs/xvfb.log 2>&1 &
   - sleep 3
   - sudo -u ubuntu DISPLAY=:99 nohup fluxbox >/home/ubuntu/logs/fluxbox.log 2>&1 &
@@ -507,6 +510,9 @@ runcmd:
   - sudo -u ubuntu DISPLAY=:99 nohup x11vnc -display :99 -forever -shared -bg -nopw -xkb -listen 0.0.0.0 -rfbport 5900 >/home/ubuntu/logs/vnc.log 2>&1 &
   - sleep 2
   - echo "Desktop environment ready - VNC accessible on port 5900" >> /var/log/billy-status.log
+  - echo "Cloning GiveGrove repository..." >> /var/log/billy-status.log
+  - sudo -u ubuntu git clone https://${githubToken}@github.com/${owner}/${repo}.git /home/ubuntu/GiveGrove
+  - echo "GiveGrove repository cloned successfully" >> /var/log/billy-status.log
   - echo "VM is ready for Ansible execution from Railway" >> /var/log/billy-status.log
   - echo "Billy VM Phase 3 setup completed at $(date)" >> /var/log/billy-status.log
 `;

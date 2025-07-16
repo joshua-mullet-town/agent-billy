@@ -444,39 +444,63 @@ Please check the configuration and try again.
     try {
       console.log(`🔍 Waiting for cloud-init completion on VM ${vmIp}`);
       
-      // Wait up to 4 minutes for cloud-init to complete (research shows 30-60s is typical)
-      const maxAttempts = 24; // 24 attempts * 10 seconds = 4 minutes
+      // ROBUST APPROACH: Use SSH + cloud-init status --wait (official method)
+      // Wait up to 2 minutes for cloud-init to complete (research shows 30-60s is typical)
+      const maxAttempts = 8; // 8 attempts with exponential backoff
       
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        console.log(`📋 Attempt ${attempt}/${maxAttempts}: Checking cloud-init status...`);
+        console.log(`📋 Attempt ${attempt}/${maxAttempts}: Checking cloud-init status via SSH...`);
         
         try {
-          // Check if web server is responding (indicates runcmd completed)
-          const response = await fetch(`http://${vmIp}:8080/billy-enhanced-setup.log`, {
-            method: 'GET',
-            signal: AbortSignal.timeout(5000) // 5 second timeout per request
+          // Use SSH to check cloud-init status (most reliable method)
+          const { spawn } = require('child_process');
+          const result = await new Promise<{success: boolean, output: string}>((resolve) => {
+            const sshProcess = spawn('ssh', [
+              '-o', 'StrictHostKeyChecking=no',
+              '-o', 'UserKnownHostsFile=/dev/null',
+              '-o', 'ConnectTimeout=10',
+              '-i', '/tmp/ssh_key',
+              `ubuntu@${vmIp}`,
+              'sudo cloud-init status --wait --timeout=30'
+            ], { timeout: 45000 }); // 45 second timeout
+            
+            let output = '';
+            let error = '';
+            
+            sshProcess.stdout.on('data', (data: any) => output += data.toString());
+            sshProcess.stderr.on('data', (data: any) => error += data.toString());
+            
+            sshProcess.on('close', (code: number | null) => {
+              const success = code === 0;
+              resolve({ success, output: output + error });
+            });
+            
+            sshProcess.on('error', (err: any) => {
+              resolve({ success: false, output: err.message });
+            });
           });
           
-          if (response.ok) {
-            const logContent = await response.text();
-            if (logContent.includes('Enhanced setup completed')) {
-              console.log(`✅ Cloud-init completed successfully on VM ${vmIp} (${attempt * 10}s total)`);
-              console.log(`📋 Setup log: ${logContent.substring(0, 200)}...`);
-              return true;
-            }
+          if (result.success) {
+            console.log(`✅ Cloud-init completed successfully on VM ${vmIp} (attempt ${attempt})`);
+            console.log(`📋 Status: ${result.output.trim()}`);
+            return true;
+          } else {
+            console.log(`📋 Attempt ${attempt}: ${result.output.trim()}`);
           }
+          
         } catch (error) {
-          console.log(`📋 Attempt ${attempt}: Web server not ready yet`);
+          console.log(`📋 Attempt ${attempt}: SSH connection failed - ${error}`);
         }
         
-        // Wait 10 seconds before next attempt (more responsive than 20s)
+        // Exponential backoff: 5s, 10s, 15s, 20s, 25s, 30s, 30s, 30s
         if (attempt < maxAttempts) {
-          console.log(`⏳ Waiting 10 seconds before next check...`);
-          await new Promise(resolve => setTimeout(resolve, 10000));
+          const backoffTime = Math.min(5000 * attempt, 30000);
+          console.log(`⏳ Waiting ${backoffTime/1000}s before next check...`);
+          await new Promise(resolve => setTimeout(resolve, backoffTime));
         }
       }
       
-      console.log(`❌ Cloud-init did not complete within 4 minutes on VM ${vmIp}`);
+      console.log(`❌ Cloud-init did not complete within 2 minutes on VM ${vmIp}`);
       return false;
       
     } catch (error) {
@@ -710,16 +734,15 @@ packages:
   - build-essential
 
 runcmd:
-  - echo "Billy VM Phase 1 - Enhanced Setup Started" > /var/log/billy-enhanced-setup.log
-  - echo "SSH key installed successfully" >> /var/log/billy-enhanced-setup.log
-  - echo "Basic packages installed" >> /var/log/billy-enhanced-setup.log
-  - echo "Installing Node.js 20 LTS..." >> /var/log/billy-enhanced-setup.log
+  - echo "Billy VM Phase 1 - Enhanced Setup Started" > /var/log/billy-setup.log
+  - echo "SSH key installed successfully" >> /var/log/billy-setup.log
+  - echo "Basic packages installed" >> /var/log/billy-setup.log
+  - echo "Installing Node.js 20 LTS..." >> /var/log/billy-setup.log
   - curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
   - apt-get install -y nodejs
-  - cd /var/log && python3 -m http.server 8080 &
-  - echo "Web server started on port 8080" >> /var/log/billy-enhanced-setup.log
-  - echo "VM ready for SSH access and Ansible execution" >> /var/log/billy-enhanced-setup.log
-  - echo "Enhanced setup completed" >> /var/log/billy-enhanced-setup.log
+  - echo "Node.js $(node --version) installed" >> /var/log/billy-setup.log
+  - echo "VM ready for SSH access and Ansible execution" >> /var/log/billy-setup.log
+  - echo "Enhanced setup completed" >> /var/log/billy-setup.log
 `;
   }
 

@@ -409,3 +409,13 @@ This philosophy ensures we build something genuinely reliable rather than someth
 - **Template compliance required** - Fill out every section or you're not following protocols
 
 This system ensures continuous momentum and context preservation across all agent handoffs and context compactions.
+
+## ⚠️ **DANGER MODE: SKIP PERMISSIONS ENABLED** ⚠️
+
+**CRITICAL SAFETY RULES WHEN PERMISSIONS ARE BYPASSED:**
+- ✅ **ALLOWED**: Make any changes to agent-billy repository
+- ❌ **FORBIDDEN**: Delete any files or directories 
+- ❌ **FORBIDDEN**: Make pushes/merges to GiveGrove repo without explicit consent
+- ❌ **FORBIDDEN**: Make unsolicited/undiscussed changes to GiveGrove
+
+This mode is ONLY for debugging critical issues and should be used with extreme caution.

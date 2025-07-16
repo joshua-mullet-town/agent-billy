@@ -507,3 +507,27 @@ Need to debug why Billy isn't detecting cloud-init completion and proceeding to 
 **Key Breakthrough:** This uses the official cloud-init completion detection method instead of our hacky web server approach. Should eliminate the "stuck in wait loop" issue completely.
 
 **Status:** Deployed to Railway, ready for testing
+
+## 🔍 **DEBUGGING: SSH Key Working, VM Readiness Check Issue**
+
+**Problem:** Billy's practical VM readiness check isn't working despite SSH being functional
+**Investigation Results:**
+- ✅ SSH key base64 decoding working correctly in Railway
+- ✅ SSH connection from Railway to VM working (tested manually)
+- ✅ VM responding to SSH commands (`whoami` returns 'ubuntu')
+- ❌ Billy's `waitForVMReadiness()` method not detecting Node.js properly
+
+**Current VM State:**
+- VM: 157.245.116.116
+- Node.js: v12.22.9 (should be v20.x) - this is the issue!
+- Cloud-init: status done
+
+**Root Cause:** Cloud-init failed to install Node.js 20, still has default v12. Billy's readiness check correctly detects this and keeps waiting.
+
+**SOLUTION FOUND:** SSH is working perfectly! The issue was cloud-init installing default Node.js 12 in packages, then trying to upgrade to Node.js 20, creating conflict.
+
+**Fix Applied:** Removed `nodejs` and `npm` from packages section, letting runcmd install Node.js 20 cleanly via NodeSource script.
+
+**Key Learning:** Billy's VM readiness check was working correctly - it detected Node.js 12 instead of expected v20.x and properly waited. This shows the practical VM readiness approach is working!
+
+**Status:** Fixed cloud-init script, ready to test complete workflow

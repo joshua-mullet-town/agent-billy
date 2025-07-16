@@ -420,6 +420,27 @@ This system ensures continuous momentum and context preservation across all agen
 
 This mode is ONLY for debugging critical issues and should be used with extreme caution.
 
+## 🚨 **MANDATORY: SSH ISSUES CHECKLIST FOR FUTURE AGENTS** 🚨
+
+**IF YOU ENCOUNTER SSH CONNECTIVITY ISSUES:**
+
+1. **NEVER skip SSH or bypass authentication**
+2. **ALWAYS check SSH_KEY_DEBUGGING.md first** - we have 16 tested format combinations
+3. **ALWAYS use Base64 encoding** for SSH private keys in Railway environment variables
+4. **ALWAYS decode with Buffer.from()** - this is the proven solution
+5. **NEVER assume SSH is broken** - it's usually a format issue
+
+**Working Implementation (from SSH_KEY_DEBUGGING.md):**
+```javascript
+// In Railway environment variable (as base64):
+const base64Key = Buffer.from(privateKeyContent).toString('base64');
+
+// In Billy's code:
+const privateKey = Buffer.from(process.env.SSH_PRIVATE_KEY, 'base64').toString('ascii');
+```
+
+**This SSH issue has been solved multiple times. The solution is documented and working.**
+
 ## 🎉 **MAJOR WIN: ROBUST CLOUD-INIT DETECTION SYSTEM**
 
 **Date**: 2025-07-16

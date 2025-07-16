@@ -727,8 +727,6 @@ packages:
   - git
   - curl
   - wget
-  - nodejs
-  - npm
   - build-essential
 
 runcmd:

@@ -444,8 +444,8 @@ Please check the configuration and try again.
     try {
       console.log(`🔍 Waiting for cloud-init completion on VM ${vmIp}`);
       
-      // Wait up to 10 minutes for cloud-init to complete
-      const maxAttempts = 30; // 30 attempts * 20 seconds = 10 minutes
+      // Wait up to 4 minutes for cloud-init to complete (research shows 30-60s is typical)
+      const maxAttempts = 24; // 24 attempts * 10 seconds = 4 minutes
       
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         console.log(`📋 Attempt ${attempt}/${maxAttempts}: Checking cloud-init status...`);
@@ -454,29 +454,29 @@ Please check the configuration and try again.
           // Check if web server is responding (indicates runcmd completed)
           const response = await fetch(`http://${vmIp}:8080/billy-enhanced-setup.log`, {
             method: 'GET',
-            signal: AbortSignal.timeout(10000) // 10 second timeout
+            signal: AbortSignal.timeout(5000) // 5 second timeout per request
           });
           
           if (response.ok) {
             const logContent = await response.text();
             if (logContent.includes('Enhanced setup completed')) {
-              console.log(`✅ Cloud-init completed successfully on VM ${vmIp}`);
+              console.log(`✅ Cloud-init completed successfully on VM ${vmIp} (${attempt * 10}s total)`);
               console.log(`📋 Setup log: ${logContent.substring(0, 200)}...`);
               return true;
             }
           }
         } catch (error) {
-          console.log(`📋 Attempt ${attempt}: Web server not ready yet (${error})`);
+          console.log(`📋 Attempt ${attempt}: Web server not ready yet`);
         }
         
-        // Wait 20 seconds before next attempt
+        // Wait 10 seconds before next attempt (more responsive than 20s)
         if (attempt < maxAttempts) {
-          console.log(`⏳ Waiting 20 seconds before next check...`);
-          await new Promise(resolve => setTimeout(resolve, 20000));
+          console.log(`⏳ Waiting 10 seconds before next check...`);
+          await new Promise(resolve => setTimeout(resolve, 10000));
         }
       }
       
-      console.log(`❌ Cloud-init did not complete within 10 minutes on VM ${vmIp}`);
+      console.log(`❌ Cloud-init did not complete within 4 minutes on VM ${vmIp}`);
       return false;
       
     } catch (error) {

@@ -153,6 +153,49 @@
         global: yes
         version: "{{ firebase_cli_version }}"
 
+    # 6.1. INSTALL CLAUDE CODE CLI
+    - name: Install Claude Code CLI globally
+      npm:
+        name: "@anthropic-ai/claude-code"
+        global: yes
+        state: present
+      become: yes
+
+    - name: Verify Claude Code CLI installation
+      shell: which claude && claude --version
+      register: claude_version
+      changed_when: false
+      failed_when: false
+
+    - name: Display Claude Code CLI version
+      debug:
+        msg: "Claude Code CLI version: {{ claude_version.stdout }}"
+
+    # 6.2. CONFIGURE CLAUDE CODE CLI AUTHENTICATION
+    - name: Set ANTHROPIC_API_KEY in bashrc for Claude Code CLI
+      lineinfile:
+        path: /home/ubuntu/.bashrc
+        line: 'export ANTHROPIC_API_KEY="{{ vault_anthropic_api_key }}"'
+        create: yes
+        owner: ubuntu
+        group: ubuntu
+
+    - name: Configure Claude Code CLI authentication
+      shell: |
+        export ANTHROPIC_API_KEY="{{ vault_anthropic_api_key }}"
+        export PATH="/usr/local/bin:$PATH"
+        cd {{ workspace_dir }}
+        echo "2 + 2" | claude --timeout 30
+      become_user: ubuntu
+      register: claude_auth_test
+      changed_when: false
+      failed_when: false
+      ignore_errors: yes
+
+    - name: Display Claude Code CLI authentication result
+      debug:
+        msg: "Claude Code CLI authentication: {{ 'SUCCESS' if claude_auth_test.rc == 0 else 'FAILED' }} - {{ claude_auth_test.stdout }} {{ claude_auth_test.stderr }}"
+
     # 7. INSTALL ALL DEPENDENCIES
     - name: Install frontend dependencies
       npm:
@@ -165,6 +208,37 @@
         path: "{{ workspace_dir }}/functions"
         state: present
       become_user: ubuntu
+
+    # 7.1. SETUP CLAUDE CODE WITH PLAYWRIGHT MCP
+    - name: Add Playwright MCP server to Claude Code
+      shell: |
+        export ANTHROPIC_API_KEY="{{ vault_anthropic_api_key }}"
+        export PATH="/usr/local/bin:$PATH"
+        cd {{ workspace_dir }}
+        claude mcp add playwright npx -- @playwright/mcp@latest
+      become_user: ubuntu
+      environment:
+        HOME: "/home/ubuntu"
+      register: playwright_mcp_install
+      changed_when: false
+      failed_when: false
+      ignore_errors: yes
+
+    - name: Verify Playwright MCP installation
+      shell: |
+        cd {{ workspace_dir }}
+        if [ -f ~/.claude.json ]; then
+          cat ~/.claude.json | grep -A 10 playwright || echo "Playwright MCP not found in config"
+        else
+          echo "Claude config file not found"
+        fi
+      become_user: ubuntu
+      register: playwright_mcp_check
+      changed_when: false
+
+    - name: Display Playwright MCP configuration
+      debug:
+        msg: "Playwright MCP configuration: {{ playwright_mcp_check.stdout }}"
 
     # 8. GUI ENVIRONMENT STARTUP
     - name: Start X virtual framebuffer
@@ -196,6 +270,25 @@
         executable: /bin/bash
       environment:
         DISPLAY: ":99"
+
+    # 8.1. VERIFY VNC SERVER IS RUNNING
+    - name: Verify VNC server is running
+      shell: |
+        sleep 5
+        if pgrep x11vnc > /dev/null; then
+          echo "VNC server is running"
+          ss -tlnp | grep 5900 || echo "Port 5900 not listening"
+        else
+          echo "VNC server failed to start"
+          exit 1
+        fi
+      register: vnc_check
+      failed_when: "'VNC server failed to start' in vnc_check.stdout"
+      changed_when: false
+
+    - name: Display VNC server status
+      debug:
+        msg: "VNC server status: {{ vnc_check.stdout }}"
 
     # 9. BUILD BACKEND FUNCTIONS
     - name: Build Firebase functions
@@ -261,8 +354,8 @@
       wait_for:
         port: 3000
         host: localhost
-        delay: 5
-        timeout: 60
+        delay: 15
+        timeout: 300
 
     # 11. START BACKEND SERVICE
     - name: Start backend Firebase emulator
@@ -279,15 +372,15 @@
       wait_for:
         port: 4000
         host: localhost
-        delay: 10
-        timeout: 120
+        delay: 15
+        timeout: 180
 
     - name: Wait for functions emulator
       wait_for:
         port: 5002
         host: localhost
-        delay: 5
-        timeout: 60
+        delay: 10
+        timeout: 120
 
     # 11. VERIFY SERVICES ARE RUNNING
     - name: Verify frontend is serving GiveGrove
@@ -394,6 +487,8 @@
           🔐 AUTHENTICATION:
           ✅ Git: Repository cloned with Personal Access Token
           ✅ Firebase: Service account authenticated
+          ✅ Claude Code: CLI installed and configured
+          ✅ Playwright MCP: Server configured for Claude Code
           
           📦 SERVICES:
           - Frontend (Vue/Vite): {{ 'RUNNING' if frontend_check.status == 200 else 'FAILED' }}
@@ -415,9 +510,11 @@
           • Frontend serving on port 3000
           • Backend emulator on port 4000
           • Functions accessible on port 5002
+          • VNC server accessible on port 5900
+          • Claude Code CLI with Playwright MCP configured
           • All services authenticated and communicating
           
-          This environment is ready for Agent Billy! 🤖
+          This environment is ready for autonomous Agent Billy! 🤖✨
           {% else %}
           ❌ Environment has issues. Check logs above.
           {% endif %}

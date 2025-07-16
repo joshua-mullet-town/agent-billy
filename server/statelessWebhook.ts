@@ -732,13 +732,11 @@ packages:
 write_files:
   - path: /home/ubuntu/.vault_pass
     content: "${vaultPassword}"
-    owner: ubuntu:ubuntu
     permissions: '0600'
   - path: /home/ubuntu/inventory.yml
     content: |
       [vm_instance]
       localhost ansible_connection=local
-    owner: ubuntu:ubuntu
     permissions: '0644'
   - path: /home/ubuntu/run-ansible.sh
     content: |
@@ -789,13 +787,15 @@ write_files:
       fi
       
       echo "$(date): Billy VM self-configuration script completed" >> /var/log/billy-ansible.log
-    owner: ubuntu:ubuntu
     permissions: '0755'
 
 runcmd:
   - echo "Billy VM Self-Configuration Started (Cloud-Init Architecture)" > /var/log/billy-setup.log
   - echo "SSH key installed successfully" >> /var/log/billy-setup.log
   - echo "Basic packages installed" >> /var/log/billy-setup.log
+  - echo "Fixing file ownership for ubuntu user..." >> /var/log/billy-setup.log
+  - chown -R ubuntu:ubuntu /home/ubuntu
+  - echo "File ownership fixed" >> /var/log/billy-setup.log
   - echo "Installing Node.js 20 via snap (most reliable)..." >> /var/log/billy-setup.log
   - snap install node --classic --channel=20/stable >> /var/log/billy-setup.log 2>&1
   - echo "Node.js $(/snap/bin/node --version) installed via snap" >> /var/log/billy-setup.log

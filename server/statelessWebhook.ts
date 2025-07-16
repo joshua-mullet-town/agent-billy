@@ -507,15 +507,16 @@ echo "Automation script ready" >> /home/ubuntu/billy-status.log`
         return false;
       }
       
-      // Step 2: Start automation script in background
+      // Step 2: Start automation script in background (Railway exits immediately)
       console.log(`🚀 Starting background automation process on ${vmIp}`);
       const startResult = await new Promise<boolean>((resolve) => {
         const sshProcess = spawn('ssh', [
           '-i', '/tmp/ssh_key',
           '-o', 'StrictHostKeyChecking=no',
-          '-o', 'ConnectTimeout=15', 
+          '-o', 'ConnectTimeout=10', 
           `ubuntu@${vmIp}`,
-          'nohup /home/ubuntu/automation.sh > /home/ubuntu/automation.log 2>&1 & echo "Background automation started" >> /home/ubuntu/billy-status.log && echo "AUTOMATION_STARTED"'
+          // Critical: Use disown to completely detach from Railway session
+          'nohup /home/ubuntu/automation.sh > /home/ubuntu/automation.log 2>&1 & disown; echo "AUTOMATION_STARTED"; exit 0'
         ], { stdio: 'pipe' });
 
         let output = '';
@@ -536,7 +537,7 @@ echo "Automation script ready" >> /home/ubuntu/billy-status.log`
           sshProcess.kill();
           console.log(`🚀 Background start timed out`);
           resolve(false);
-        }, 20000);
+        }, 10000); // 10 seconds - just enough to start background process
       });
       
       if (startResult) {
@@ -558,7 +559,9 @@ echo "Automation script ready" >> /home/ubuntu/billy-status.log`
     return `#!/bin/bash
 set -e
 
+# Completely independent execution - no Railway dependency
 echo "=== Billy Automation Script Started at $(date) ===" >> /home/ubuntu/automation.log
+echo "VM is now independent of Railway - full automation starting" >> /home/ubuntu/automation.log
 
 # Download Ansible playbook and secrets
 echo "Downloading Ansible playbook..." >> /home/ubuntu/automation.log

@@ -669,11 +669,11 @@ This SESSION.md is your complete reference guide. Steps 1-4B are proven working.
 - 🔧 **Next**: Fix YAML quote issue and test complete hybrid automation flow
 
 ## What We're Doing Next  
-**TESTING HYBRID SSH KICKOFF APPROACH**: Revolutionary new architecture test
-- 🎯 **Current Test**: Billy creating VM with minimal SSH-only cloud-config (no complex automation)
-- 🔍 **Key Innovation**: Railway will SSH in to start background automation, then exit cleanly
-- 📊 **Success Criteria**: SSH access works + background automation starts + VM continues independently
-- 🚀 **Expected Outcome**: Solves both SSH issues AND Railway timeout constraints simultaneously
+**TESTING COMPLETE HYBRID AUTOMATION FLOW**: SSH success confirmed, testing full workflow
+- 🎯 **Current Test**: Billy triggered again with SSH-proven approach (clean cloud-config)
+- 🔍 **Test Target**: SSH kickoff → background automation → full environment → autonomous implementation
+- 📊 **Success Criteria**: SSH access + automation upload + background execution + PR creation
+- 🚀 **Expected Result**: First complete end-to-end automation success
 
 ## Your Part
 Validate the hybrid SSH kickoff strategy:

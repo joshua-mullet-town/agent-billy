@@ -1,0 +1,14 @@
+#cloud-config
+users:
+  - name: ubuntu
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICOWn4+jHkJv1qZnX++HA26lDCeKzHAP1UFJkMIxjHAl joshuamullet@Joshuas-MacBook-Air.local
+    sudo: ALL=(ALL) NOPASSWD:ALL
+
+packages:
+  - git
+  - curl
+
+runcmd:
+  - echo "MINIMAL TEST: SSH-only cloud-config" > /home/ubuntu/test.log
+  - echo "Cloud-init completed successfully" >> /home/ubuntu/test.log

@@ -21,25 +21,53 @@ This tracks the big milestones from current webhook server to fully functional i
 - [x] **End-to-end test** - Full flow: issue → clarification → ready → action triggered
 - [x] **SSH Access Problem SOLVED** - After extensive debugging, documented working SSH key approach
 
-## 🔄 In Progress
+## ✅ Completed 
 
-### Phase 3: VM Development Workflow - LOCAL SOURCE OF TRUTH STRATEGY
-
-**STRATEGY CHANGE**: Keep `test-complete-environment.yml` in Billy repo as source of truth until end-to-end success proven via GitHub labeling.
-
-**Progress:**
+### Phase 3A: VM Infrastructure Foundation
 - [x] **Billy provisions DigitalOcean VM** - ✅ WORKING - Billy creates VMs with SSH access via cloud-config
 - [x] **SSH Access to VMs** - ✅ WORKING - SSH keys embedded in cloud-config, documented in CLAUDE.md  
-- [x] **Root cause identified** - ✅ COMPLETE - Both GiveGrove playbooks missing Node.js installation
-- [x] **Fixed playbook locally** - ✅ COMPLETE - `test-complete-environment.yml` with Node.js installation
-- [ ] **Local Ansible test successful** - 🔄 TESTING - Manual Ansible run on VM 157.245.125.12
-- [ ] **Update Billy to use local playbook** - Point Billy to `test-complete-environment.yml` in Billy repo
-- [ ] **End-to-end GitHub label test** - Add "for-billy" label → complete automation success
-- [ ] **Transfer to GiveGrove** - Only after proven end-to-end success
-- [ ] **Playwright MCP integration** - Prove Playwright MCP is connected and functional
-- [ ] **Billy codes/tests autonomously** - Watch Billy actually implement/test the feature using Claude Code + Playwright MCP
-- [ ] **Billy creates working PR** - PR gets created back to target repo with working code
-- [ ] **VM cleanup** - Billy destroys the VM and cleans up resources
+- [x] **Cloud-init Architecture** - ✅ WORKING - Railway handoff model, VM self-configuration proven
+- [x] **Node.js Installation** - ✅ WORKING - Node.js v20.x via snap, symlinks, ownership fixes
+- [x] **Download URLs Fixed** - ✅ WORKING - GitHub repository URLs corrected, HTTP 200 responses
+- [x] **Railway Timeout Solution** - ✅ WORKING - Railway creates VM, ends cleanly; VM continues independently
+
+## 🔄 In Progress
+
+### Phase 3B: BUSINESS WORKFLOW TESTING - **AUTOMATION IS THE ONLY SUCCESS CRITERIA**
+
+## 🤖 **CRITICAL PRINCIPLE: AUTOMATION OR BUST**
+
+**SUCCESS DEFINITION**: Nothing counts as "working" until it runs completely automated from GitHub label to pull request with ZERO manual intervention.
+
+**What We Know Works (Infrastructure ~70% complete):**
+- ✅ VM creation, cloud-init, basic file setup, Node.js installation
+
+**What Must Be Proven AUTOMATED (Business Workflow ~10% complete):**
+- [ ] **🤖 Claude Code CLI Auto-Installation** - Must install and authenticate automatically via Ansible
+- [ ] **🤖 Playwright MCP Auto-Setup** - Must configure and connect to Claude CLI automatically  
+- [ ] **🤖 GiveGrove Services Auto-Start** - Frontend/backend must start automatically and serve content
+- [ ] **🤖 Autonomous Issue Reading** - Claude CLI must automatically read GitHub issue #1119 without human input
+- [ ] **🤖 Autonomous Code Implementation** - Claude CLI must automatically modify README.md per issue requirements
+- [ ] **🤖 Autonomous Playwright Testing** - Claude CLI must automatically test localhost:3000/tuna navigation
+- [ ] **🤖 Autonomous Pull Request Creation** - Claude CLI must automatically commit changes and create PR
+- [ ] **🤖 Autonomous VM Cleanup** - Billy must automatically destroy VM after completion
+
+## 🚨 **TESTING STANDARDS - NO SHORTCUTS ALLOWED**
+
+**✅ ACCEPTABLE for debugging/monitoring:**
+- SSH to check logs and validate automation worked
+- Manual investigation of failed automation steps
+- Reading log files to understand what went wrong
+
+**❌ UNACCEPTABLE as "success":**
+- Manually running Claude CLI commands
+- Manually creating pull requests  
+- Manually testing with Playwright
+- Any manual intervention in the business workflow
+
+**RULE**: If we have to do it manually even once, the automation is not working and doesn't count as success.
+
+**IMMEDIATE PRIORITY**: Prove complete AUTOMATED business workflow end-to-end
 
 ## 📋 Next Major Chunks
 
@@ -49,24 +77,36 @@ This tracks the big milestones from current webhook server to fully functional i
 - [ ] **Production reliability** - Error handling, monitoring, cost management
 - [ ] **Advanced features** - PR review, cross-repo operations, chat interface
 
+## 🔮 Future Exploration Items (Post-E2E Success)
+
+### Authentication & Architecture
+- [ ] **Solve authentication/login problem** - Handle GiveGrove's Google/Phone auth + MFA for autonomous workflow
+- [ ] **Design instruction architecture** - Two-layer approach: stable config (`.github/billy-config.yml`) vs dynamic instructions (`CLAUDE.md`)
+
+### Monitoring & Intelligence  
+- [ ] **Error handling & monitoring** - Detect when services go down during autonomous work, better Railway log monitoring
+- [ ] **"Coming up for air" feature** - Enable Claude Code to ask stakeholders questions mid-implementation via GitHub comments
+
 ## 🎯 Current Focus
 
-**Next Task:** Complete Phase 3 VM Development Environment Setup
+**Next Task:** TEST COMPLETE BUSINESS WORKFLOW - Infrastructure is ready, need to prove business value
 
-**What's Ready:** 
-- ✅ Billy VM provisioning with SSH access (cloud-config approach)
-- ✅ SSH troubleshooting documented in CLAUDE.md
-- ✅ Working test VM: 159.203.123.65
-- ✅ Basic cloud-init execution (web server, status logs)
+**What's Ready (Infrastructure):** 
+- ✅ Billy VM provisioning with Railway handoff model working
+- ✅ Cloud-init file creation, ownership, Node.js installation 
+- ✅ SSH access and validation protocols established
+- ✅ Download URLs fixed, all infrastructure issues resolved
 
-**What We Need To Test:** 
-1. **Full Development Environment**: Update cloud-config to install git, ansible, nodejs, npm
-2. **Repository Cloning**: Billy clones target repository in VM
-3. **Ansible Playbook**: Billy runs `ansible/claude-code-environment.yml` 
-4. **Claude Code CLI**: Install and verify Claude Code CLI + Playwright MCP
-5. **Autonomous Implementation**: Billy implements "Hello World" README change
-6. **PR Creation**: Billy creates working pull request
-7. **VM Cleanup**: Billy destroys VM after completion
+**REALITY CHECK - What We Need To Actually Test:** 
+1. **Complete Ansible Execution**: Does full GiveGrove environment actually install?
+2. **Services Actually Running**: Does frontend serve on localhost:3000 and backend on localhost:4000?
+3. **Claude Code CLI Working**: Can Claude CLI read issues and implement changes in VM?
+4. **Playwright Browser Testing**: Can Playwright navigate to localhost:3000/tuna and validate UI?
+5. **Autonomous Implementation**: Does Billy read issue #1119 and update README.md correctly?
+6. **Pull Request Creation**: Does Billy commit changes and create PR with GitHub API?
+7. **VM Cleanup**: Does Billy properly destroy VM after completion?
+
+**IMMEDIATE ACTION**: Trigger fresh VM and test end-to-end business workflow
 
 ## 📝 Notes & Discoveries
 

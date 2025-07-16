@@ -350,33 +350,51 @@ I'm now implementing this feature using a dedicated development environment.
         return;
       }
 
-      // PHASE 1 SUCCESS - Proceed to Ansible
-      await this.actions.commentOnIssue(owner, repo, issue.number, 
-        `✅ **Phase 1 Complete - Starting Ansible Setup!**
+      // PHASE 1 SUCCESS - SSH KICKOFF AUTOMATION
+      console.log(`🚀 SSH kickoff: Starting background automation on ${readyVM.publicIp}`);
+      
+      const automationStarted = await this.startBackgroundAutomation(readyVM.publicIp || '', owner, repo, issue);
+      
+      if (!automationStarted) {
+        await this.actions.commentOnIssue(owner, repo, issue.number, 
+          `❌ **SSH Kickoff Failed**
+          
+**What Failed:**
+- Could not SSH into VM to start automation
+- Background automation script not started
+- VM is running but automation blocked
+
+**Debug Steps:**
+\`\`\`bash
+ssh ubuntu@${readyVM.publicIp} "cat /home/ubuntu/billy-status.log"
+ssh ubuntu@${readyVM.publicIp} "ps aux | grep -E '(ansible|automation)'"
+\`\`\`
+
+*VM available for manual debugging at ${readyVM.publicIp}*`);
         
-**Phase 1 Results:**
-- ✅ VM provisioned successfully
-- ✅ Cloud-config executed (infrastructure proven via manual testing)  
-- ✅ SSH connectivity bypassed (Railway platform limitations)
-- ✅ VM ready for Ansible execution
+        await this.actions.addLabel(owner, repo, issue.number, 'billy-kickoff-failed');
+        return;
+      }
 
-**Phase 2 Starting:**
-- 🔧 Running Ansible playbook for desktop environment
-- 📦 Installing GUI packages (xvfb, fluxbox, x11vnc, firefox)
-- 🖥️  Setting up VNC access
-- 📁 Cloning GiveGrove repository
-
-*Executing ansible/claude-code-environment.yml...*`);
-
-      // NEW ARCHITECTURE: VM self-configures via cloud-init (Railway timeout immune)
+      // SUCCESSFUL KICKOFF
       await this.actions.commentOnIssue(owner, repo, issue.number, 
-        `🚀 **VM Self-Configuration Started!**
+        `🚀 **Automation Started Successfully!**
         
-**New Cloud-Init Architecture:**
-- ✅ VM created with enhanced cloud-init script
-- 🔄 VM downloading and running Ansible playbook locally
-- ⏱️ **Railway timeout immunity**: VM configures itself independently
-- 📊 **Monitor via SSH**: Use \`ssh ubuntu@${readyVM.publicIp}\` to check progress
+**Hybrid Architecture Working:**
+- ✅ VM provisioned and SSH access confirmed
+- ✅ Background automation script started via SSH
+- ✅ Railway job completing (timeout immunity achieved)
+- 🔄 VM continuing automation independently
+
+**What's Running:**
+- 📦 Installing Node.js, Firebase, Claude CLI
+- 🖥️ Setting up desktop environment (VNC, Firefox)  
+- 📁 Cloning GiveGrove and installing dependencies
+- 🤖 Configuring autonomous Claude CLI implementation
+
+**Monitor Progress:**
+\`\`\`bash
+ssh ubuntu@${readyVM.publicIp} "tail -f /home/ubuntu/automation.log"
 
 **VM Self-Configuration Process:**
 1. 📥 Download Ansible playbook and secrets from Railway
@@ -434,6 +452,158 @@ Please check the configuration and try again.
       
       await this.actions.addLabel(owner, repo, issue.number, 'billy-vm-error');
     }
+  }
+
+  // SSH KICKOFF: Start background automation script on VM  
+  private async startBackgroundAutomation(vmIp: string, owner: string, repo: string, issue: any): Promise<boolean> {
+    try {
+      console.log(`🔧 Starting background automation on ${vmIp}`);
+      
+      // Generate automation script content
+      const automationScript = this.generateAutomationScript(owner, repo, issue);
+      const vaultPassword = process.env.ANSIBLE_VAULT_PASSWORD || '';
+      
+      const { spawn } = require('child_process');
+      
+      // Step 1: Upload automation script to VM
+      console.log(`📤 Uploading automation script to ${vmIp}`);
+      const uploadResult = await new Promise<boolean>((resolve) => {
+        const sshProcess = spawn('ssh', [
+          '-i', '/tmp/ssh_key',
+          '-o', 'StrictHostKeyChecking=no', 
+          '-o', 'ConnectTimeout=15',
+          `ubuntu@${vmIp}`,
+          `cat > /home/ubuntu/automation.sh << 'AUTOMATION_SCRIPT_EOF'
+${automationScript}
+AUTOMATION_SCRIPT_EOF
+chmod +x /home/ubuntu/automation.sh
+echo "${vaultPassword}" > /home/ubuntu/.vault_pass
+chmod 600 /home/ubuntu/.vault_pass
+echo "Automation script ready" >> /home/ubuntu/billy-status.log`
+        ], { stdio: 'pipe' });
+
+        let output = '';
+        let error = '';
+        
+        sshProcess.stdout.on('data', (data: any) => output += data.toString());
+        sshProcess.stderr.on('data', (data: any) => error += data.toString());
+        
+        sshProcess.on('close', (code: number) => {
+          const success = code === 0;
+          console.log(`📤 Script upload result: ${success ? 'SUCCESS' : 'FAILED'} (code: ${code})`);
+          if (!success) console.log(`📤 Upload error: ${error}`);
+          resolve(success);
+        });
+        
+        setTimeout(() => {
+          sshProcess.kill();
+          console.log(`📤 Script upload timed out`);
+          resolve(false);
+        }, 30000);
+      });
+      
+      if (!uploadResult) {
+        console.log(`❌ Failed to upload automation script to ${vmIp}`);
+        return false;
+      }
+      
+      // Step 2: Start automation script in background
+      console.log(`🚀 Starting background automation process on ${vmIp}`);
+      const startResult = await new Promise<boolean>((resolve) => {
+        const sshProcess = spawn('ssh', [
+          '-i', '/tmp/ssh_key',
+          '-o', 'StrictHostKeyChecking=no',
+          '-o', 'ConnectTimeout=15', 
+          `ubuntu@${vmIp}`,
+          'nohup /home/ubuntu/automation.sh > /home/ubuntu/automation.log 2>&1 & echo "Background automation started" >> /home/ubuntu/billy-status.log && echo "AUTOMATION_STARTED"'
+        ], { stdio: 'pipe' });
+
+        let output = '';
+        let error = '';
+        
+        sshProcess.stdout.on('data', (data: any) => output += data.toString());
+        sshProcess.stderr.on('data', (data: any) => error += data.toString());
+        
+        sshProcess.on('close', (code: number) => {
+          const success = code === 0 && output.includes('AUTOMATION_STARTED');
+          console.log(`🚀 Background start result: ${success ? 'SUCCESS' : 'FAILED'} (code: ${code})`);
+          console.log(`🚀 Start output: ${output.trim()}`);
+          if (!success) console.log(`🚀 Start error: ${error}`);
+          resolve(success);
+        });
+        
+        setTimeout(() => {
+          sshProcess.kill();
+          console.log(`🚀 Background start timed out`);
+          resolve(false);
+        }, 20000);
+      });
+      
+      if (startResult) {
+        console.log(`✅ Background automation started successfully on ${vmIp}`);
+        return true;
+      } else {
+        console.log(`❌ Failed to start background automation on ${vmIp}`);
+        return false;
+      }
+      
+    } catch (error) {
+      console.error(`❌ Error starting background automation: ${error}`);
+      return false;
+    }
+  }
+
+  // Generate automation script that runs independently on VM
+  private generateAutomationScript(owner: string, repo: string, issue: any): string {
+    return `#!/bin/bash
+set -e
+
+echo "=== Billy Automation Script Started at $(date) ===" >> /home/ubuntu/automation.log
+
+# Download Ansible playbook and secrets
+echo "Downloading Ansible playbook..." >> /home/ubuntu/automation.log
+curl -s -L "https://raw.githubusercontent.com/joshua-mullet-town/agent-billy/main/test-complete-environment.yml" -o /home/ubuntu/playbook.yml
+curl -s -L "https://raw.githubusercontent.com/joshua-mullet-town/agent-billy/main/secrets.yml" -o /home/ubuntu/secrets.yml
+
+echo "Creating inventory..." >> /home/ubuntu/automation.log
+cat > /home/ubuntu/inventory.yml << 'INVENTORY_EOF'
+all:
+  hosts:
+    vm_instance:
+      ansible_host: localhost
+      ansible_user: ubuntu
+      ansible_connection: local
+      ansible_python_interpreter: /usr/bin/python3
+INVENTORY_EOF
+
+# Install Ansible
+echo "Installing Ansible..." >> /home/ubuntu/automation.log
+sudo apt update >> /home/ubuntu/automation.log 2>&1
+sudo apt install -y python3-pip >> /home/ubuntu/automation.log 2>&1
+pip3 install ansible >> /home/ubuntu/automation.log 2>&1
+
+# Install required collections  
+echo "Installing Ansible collections..." >> /home/ubuntu/automation.log
+ansible-galaxy collection install community.general --force >> /home/ubuntu/automation.log 2>&1
+
+# Run Ansible playbook
+echo "Starting Ansible playbook execution..." >> /home/ubuntu/automation.log
+ansible-playbook -i /home/ubuntu/inventory.yml /home/ubuntu/playbook.yml --vault-password-file /home/ubuntu/.vault_pass >> /home/ubuntu/automation.log 2>&1
+
+# Log completion
+echo "=== Automation completed at $(date) ===" >> /home/ubuntu/automation.log
+echo "AUTOMATION_COMPLETE" > /home/ubuntu/completion-status.log
+
+# Create issue context for Claude CLI
+cat > /home/ubuntu/issue-context.txt << 'ISSUE_EOF'
+Repository: ${owner}/${repo}
+Issue: #${issue.number}
+Title: ${issue.title}
+Body: ${issue.body || 'No description provided'}
+ISSUE_EOF
+
+echo "Automation script completed successfully" >> /home/ubuntu/billy-status.log
+`;
   }
 
   // PHASE 1: Wait for cloud-init completion (replaces SSH test due to Railway limitations)
@@ -711,17 +881,8 @@ ansible_ssh_common_args='-o StrictHostKeyChecking=no'`;
 
   // CLOUD-INIT SELF-CONFIGURATION: VM downloads files from GitHub and runs Ansible locally (Railway timeout immune)
   private generateVMSetupScript(owner: string, repo: string, playbookPath: string, issue: any): string {
-    // Get vault password
-    const vaultPassword = process.env.ANSIBLE_VAULT_PASSWORD || '';
-    
-    // Prepare issue context for autonomous implementation
-    const issueContext = {
-      repository: `${owner}/${repo}`,
-      number: issue.number,
-      title: issue.title.replace(/"/g, '\\"'), // Escape quotes for bash
-      body: issue.body?.replace(/"/g, '\\"') || 'No description provided'
-    };
-    
+    // MINIMAL SSH-ONLY CLOUD-CONFIG 
+    // No complex automation - Railway will SSH in to start background processes
     return `#cloud-config
 users:
   - name: ubuntu
@@ -730,12 +891,14 @@ users:
     sudo: ALL=(ALL) NOPASSWD:ALL
 
 packages:
-  - git
   - curl
+  - wget
+  - git
 
 runcmd:
-  - echo "MINIMAL TEST: SSH-only cloud-config" > /home/ubuntu/test.log
-  - echo "Cloud-init completed successfully" >> /home/ubuntu/test.log`;
+  - echo "Billy VM created at $(date)" > /home/ubuntu/billy-status.log
+  - echo "SSH access ready" >> /home/ubuntu/billy-status.log
+  - echo "Waiting for Railway kickoff..." >> /home/ubuntu/billy-status.log`;
   }
 
   // Execute simple comment workflow

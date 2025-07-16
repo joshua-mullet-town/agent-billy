@@ -328,7 +328,7 @@ I'm now implementing this feature using a dedicated development environment.
       console.log(`⏳ Waiting for cloud-init to complete on VM ${readyVM.publicIp}`);
       console.log(`🔍 Checking for enhanced setup completion...`);
       
-      const phase1Success = await this.waitForCloudInitCompletion(readyVM.publicIp || '');
+      const phase1Success = await this.waitForVMReadiness(readyVM.publicIp || '');
       
       if (!phase1Success) {
         await this.actions.commentOnIssue(owner, repo, issue.number, 
@@ -440,19 +440,18 @@ Please check the configuration and try again.
   }
 
   // PHASE 1: Wait for cloud-init completion (replaces SSH test due to Railway limitations)
-  private async waitForCloudInitCompletion(vmIp: string): Promise<boolean> {
+  private async waitForVMReadiness(vmIp: string): Promise<boolean> {
     try {
-      console.log(`🔍 Waiting for cloud-init completion on VM ${vmIp}`);
+      console.log(`🔍 Waiting for VM readiness on ${vmIp}`);
       
-      // ROBUST APPROACH: Use SSH + cloud-init status --wait (official method)
-      // Wait up to 2 minutes for cloud-init to complete (research shows 30-60s is typical)
-      const maxAttempts = 8; // 8 attempts with exponential backoff
+      // Test what we actually need for Ansible to work
+      const maxAttempts = 10; // 10 attempts over ~3 minutes
       
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        console.log(`📋 Attempt ${attempt}/${maxAttempts}: Checking cloud-init status via SSH...`);
+        console.log(`📋 Attempt ${attempt}/${maxAttempts}: Testing VM readiness...`);
         
         try {
-          // Use SSH to check cloud-init status (most reliable method)
+          // Test SSH connectivity + Node.js version + basic responsiveness
           const { spawn } = require('child_process');
           const result = await new Promise<{success: boolean, output: string}>((resolve) => {
             const sshProcess = spawn('ssh', [
@@ -461,8 +460,8 @@ Please check the configuration and try again.
               '-o', 'ConnectTimeout=10',
               '-i', '/tmp/ssh_key',
               `ubuntu@${vmIp}`,
-              'sudo cloud-init status --wait --timeout=30'
-            ], { timeout: 45000 }); // 45 second timeout
+              'whoami && node --version && echo "VM Ready"'
+            ], { timeout: 20000 }); // 20 second timeout
             
             let output = '';
             let error = '';
@@ -471,7 +470,7 @@ Please check the configuration and try again.
             sshProcess.stderr.on('data', (data: any) => error += data.toString());
             
             sshProcess.on('close', (code: number | null) => {
-              const success = code === 0;
+              const success = code === 0 && output.includes('ubuntu') && output.includes('v20.') && output.includes('VM Ready');
               resolve({ success, output: output + error });
             });
             
@@ -481,30 +480,29 @@ Please check the configuration and try again.
           });
           
           if (result.success) {
-            console.log(`✅ Cloud-init completed successfully on VM ${vmIp} (attempt ${attempt})`);
-            console.log(`📋 Status: ${result.output.trim()}`);
+            console.log(`✅ VM is ready for Ansible on ${vmIp} (attempt ${attempt})`);
+            console.log(`📋 Readiness check: ${result.output.trim()}`);
             return true;
           } else {
-            console.log(`📋 Attempt ${attempt}: ${result.output.trim()}`);
+            console.log(`📋 Attempt ${attempt}: VM not ready yet - ${result.output.trim()}`);
           }
           
         } catch (error) {
-          console.log(`📋 Attempt ${attempt}: SSH connection failed - ${error}`);
+          console.log(`📋 Attempt ${attempt}: Readiness check failed - ${error}`);
         }
         
-        // Exponential backoff: 5s, 10s, 15s, 20s, 25s, 30s, 30s, 30s
+        // Fixed 20-second intervals
         if (attempt < maxAttempts) {
-          const backoffTime = Math.min(5000 * attempt, 30000);
-          console.log(`⏳ Waiting ${backoffTime/1000}s before next check...`);
-          await new Promise(resolve => setTimeout(resolve, backoffTime));
+          console.log(`⏳ Waiting 20 seconds before next readiness check...`);
+          await new Promise(resolve => setTimeout(resolve, 20000));
         }
       }
       
-      console.log(`❌ Cloud-init did not complete within 2 minutes on VM ${vmIp}`);
+      console.log(`❌ VM did not become ready within 3 minutes on ${vmIp}`);
       return false;
       
     } catch (error) {
-      console.error(`❌ Error waiting for cloud-init completion: ${error}`);
+      console.error(`❌ Error waiting for VM readiness: ${error}`);
       return false;
     }
   }

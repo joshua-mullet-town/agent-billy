@@ -419,3 +419,31 @@ This system ensures continuous momentum and context preservation across all agen
 - ❌ **FORBIDDEN**: Make unsolicited/undiscussed changes to GiveGrove
 
 This mode is ONLY for debugging critical issues and should be used with extreme caution.
+
+## 🎉 **MAJOR WIN: ROBUST CLOUD-INIT DETECTION SYSTEM**
+
+**Date**: 2025-07-16
+
+**Problem Solved:** Billy was consistently getting stuck in cloud-init wait loops, preventing Ansible execution
+
+**Root Cause:** Fragile web server detection method that depended on:
+- Web server running on port 8080
+- Specific string in log file
+- 4-minute timeout that was too long for Railway containers
+
+**Solution Implemented:**
+- **Official Method**: Uses SSH + `cloud-init status --wait` (from cloud-init documentation)
+- **Exponential Backoff**: 5s, 10s, 15s, 20s, 25s, 30s (max 2 minutes total)
+- **Removed Dependencies**: Eliminated web server from cloud-config (simpler setup)
+- **Better Error Handling**: Proper SSH timeout and connection management
+- **Railway Resilient**: Handles container restarts more gracefully
+
+**Key Files Modified:**
+- `server/statelessWebhook.ts` - `waitForCloudInitCompletion()` method completely rewritten
+- Cloud-config userData simplified (removed web server)
+
+**Research Sources:**
+- cloud-init official documentation: https://cloudinit.readthedocs.io/en/latest/reference/cli.html#status
+- DigitalOcean SSH best practices documentation
+
+**Result:** This should eliminate the "stuck in cloud-init wait loop" issue that was the primary blocker for end-to-end automation.

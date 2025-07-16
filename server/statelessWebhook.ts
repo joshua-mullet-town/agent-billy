@@ -709,20 +709,8 @@ ansible_ssh_common_args='-o StrictHostKeyChecking=no'`;
     }
   }
 
-  // CLOUD-INIT SELF-CONFIGURATION: VM downloads and runs Ansible locally (Railway timeout immune)
+  // CLOUD-INIT SELF-CONFIGURATION: VM downloads files from GitHub and runs Ansible locally (Railway timeout immune)
   private generateVMSetupScript(owner: string, repo: string, playbookPath: string, issue: any): string {
-    // Base64 encode the Ansible playbook content to embed in cloud-init
-    const fs = require('fs');
-    const path = require('path');
-    
-    // Read and encode the Ansible playbook
-    const playbookContent = fs.readFileSync(path.join(process.cwd(), playbookPath), 'utf8');
-    const playbookBase64 = Buffer.from(playbookContent).toString('base64');
-    
-    // Read and encode the secrets file
-    const secretsContent = fs.readFileSync(path.join(process.cwd(), 'secrets.yml'), 'utf8');
-    const secretsBase64 = Buffer.from(secretsContent).toString('base64');
-    
     // Get vault password
     const vaultPassword = process.env.ANSIBLE_VAULT_PASSWORD || '';
     
@@ -742,18 +730,6 @@ packages:
   - ansible-core
 
 write_files:
-  - path: /home/ubuntu/ansible-playbook.yml
-    content: |
-      ${playbookBase64}
-    encoding: b64
-    owner: ubuntu:ubuntu
-    permissions: '0644'
-  - path: /home/ubuntu/secrets.yml
-    content: |
-      ${secretsBase64}
-    encoding: b64
-    owner: ubuntu:ubuntu
-    permissions: '0600'
   - path: /home/ubuntu/.vault_pass
     content: ${vaultPassword}
     owner: ubuntu:ubuntu
@@ -770,6 +746,25 @@ write_files:
       echo "$(date): Starting Billy VM self-configuration" > /var/log/billy-ansible.log
       
       cd /home/ubuntu
+      
+      # Download Ansible playbook and secrets from Billy repo (public files)
+      echo "$(date): Downloading Ansible playbook from Billy repository..." >> /var/log/billy-ansible.log
+      curl -sL "https://raw.githubusercontent.com/south-bend-code-works/agent-billy/main/test-complete-environment.yml" -o ansible-playbook.yml >> /var/log/billy-ansible.log 2>&1
+      if [ $? -ne 0 ]; then
+        echo "$(date): FAILED to download playbook from Billy repo" >> /var/log/billy-ansible.log
+        exit 1
+      fi
+      
+      echo "$(date): Downloading secrets from Billy repository..." >> /var/log/billy-ansible.log  
+      curl -sL "https://raw.githubusercontent.com/south-bend-code-works/agent-billy/main/secrets.yml" -o secrets.yml >> /var/log/billy-ansible.log 2>&1
+      if [ $? -ne 0 ]; then
+        echo "$(date): FAILED to download secrets from Billy repo" >> /var/log/billy-ansible.log
+        exit 1
+      fi
+      
+      # Set proper permissions
+      chmod 600 secrets.yml
+      chmod 644 ansible-playbook.yml
       
       # Install additional Ansible collections if needed
       echo "$(date): Installing Ansible collections..." >> /var/log/billy-ansible.log
@@ -812,7 +807,7 @@ runcmd:
   - apt-get install -y build-essential >> /var/log/billy-setup.log 2>&1
   - echo "Build tools installed" >> /var/log/billy-setup.log
   - echo "Ansible installed via package manager" >> /var/log/billy-setup.log
-  - echo "Ansible playbook and secrets embedded in cloud-init" >> /var/log/billy-setup.log
+  - echo "Downloading Ansible playbook and secrets from GitHub..." >> /var/log/billy-setup.log
   - echo "Starting Ansible self-configuration (background process)..." >> /var/log/billy-setup.log
   - su - ubuntu -c "/home/ubuntu/run-ansible.sh" &
   - echo "Billy VM self-configuration initiated - check /var/log/billy-ansible.log for progress" >> /var/log/billy-setup.log

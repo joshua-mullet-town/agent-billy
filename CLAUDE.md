@@ -273,21 +273,23 @@ billy:
 
 ## Working Cadence for Development
 
-When helping build Agent Billy, follow this structure for each task:
+**🚨 CRITICAL: See "MANDATORY Issue-by-Issue Automation Debugging Methodology" section below for complete methodology.**
 
-### 1. **What We're Doing** 
-High-level overview of the current task or goal we're working toward. This sets the context and explains the bigger picture of what we're trying to achieve.
+When helping build Agent Billy, always follow the proven issue-by-issue debugging approach:
 
-### 2. **Why**
-The purpose and expected outcome - why this task matters, what problem it solves, and how it fits into Billy's overall evolution. This helps ensure we're aligned on the value and priority.
+### 1. **Read SESSION.md First** 
+Always start by reading SESSION.md to understand current automation state, proven working steps, documented gotchas, and next required action.
 
-### 3. **Your Part** 
-Explicit step-by-step instructions for what you need to do, broken down in extreme detail. No assumptions about technical knowledge - every command, click, and configuration spelled out clearly so you can follow along successfully.
+### 2. **Follow the End-to-End Checklist**
+Work through the 9-step automation testing checklist systematically. Never skip steps or assume components work without full end-to-end testing.
 
-### 4. **What I'll Do**
-Clear description of what Claude will handle - which files I'll modify, what code I'll write, what analysis I'll perform. This gives you visibility into my work and lets you understand the complete scope.
+### 3. **Document Issues and Fixes** 
+When automation fails, document the specific issue, root cause, solution applied, and gotchas for future agents in SESSION.md.
 
-This structure ensures you have full context and clarity about our progress, responsibilities, and next steps at all times.
+### 4. **Only Complete Automation Counts as Success**
+Manual testing, component testing, and "it should work" do not count as success. Only complete automation from GitHub label to final result counts.
+
+**See full methodology details in the "MANDATORY Issue-by-Issue Automation Debugging Methodology" section below.**
 
 ## TODO List Management
 
@@ -357,58 +359,71 @@ Billy is only "working" when:
 
 This philosophy ensures we build something genuinely reliable rather than something that appears to work under ideal conditions.
 
-## MANDATORY Session Management System
+## MANDATORY Issue-by-Issue Automation Debugging Methodology
 
-### CRITICAL REQUIREMENT: Every substantive response MUST include session management
+### CRITICAL REQUIREMENT: Follow this exact methodology for all Billy development work
 
-**Reading Requirement:** Always start by reading SESSION.md if it exists to understand current momentum and context.
+**🚨 PROVEN METHODOLOGY - DO NOT DEVIATE:**
 
-**Update Requirement:** Always end substantive responses by updating SESSION.md with current progress.
+#### 1. SESSION.md Is Your Primary Reference Guide
+- **Always read SESSION.md first** to understand current state
+- SESSION.md contains complete end-to-end testing checklist (Steps 1-9)
+- SESSION.md contains all critical gotchas discovered and fixed
+- **Never rediscover documented solutions** - check SESSION.md gotchas first
 
-**Working Cadence:** Every response must follow this structure:
-1. **What We Just Did** - Specific recent accomplishments/discoveries
-2. **What We're Doing Next** - Current exact task 
-3. **Your Part** - What the user needs to do/decide/provide
-4. **My Part** - What I'm handling in the next steps
+#### 2. Issue-by-Issue Debugging Process
+1. **Identify blocking automation issue** through end-to-end testing
+2. **Document the specific issue** in SESSION.md with root cause
+3. **Fix Billy's automation code/config** to resolve the issue
+4. **Test complete end-to-end flow** to verify fix and find next issue
+5. **Document the solution and gotchas** for future agents
+6. **Repeat until complete automation works**
 
-### SESSION.md Template (MANDATORY):
+#### 3. What Counts as Success
+- ✅ **ONLY SUCCESS**: Complete automation from GitHub label → final result
+- ❌ **NOT SUCCESS**: Manual fixes, partial testing, "it should work" 
+- ❌ **NOT SUCCESS**: Component testing without full end-to-end flow
+
+#### 4. Documentation Standards
+- **Document ALL gotchas** with exact commands and solutions
+- **Include specific failures** (wrong commands, wrong approaches)
+- **Provide working alternatives** with code examples
+- **Explain WHY solutions work** to prevent regression
+
+#### 5. SESSION.md Structure (MANDATORY)
 ```markdown
-# Session [DATE] Context
+## 🎯 END-TO-END AUTOMATION TESTING CHECKLIST
+[Steps 1-9 with status, gotchas, and test methods]
 
-## Just Completed (Last 1-3 actions)
-- [Specific thing we just proved/fixed/built with concrete results]
-- [Recent discovery or breakthrough]
-- [System state change or deployment]
+## 🚨 CURRENT OPERATIONAL STATUS
+[Next action required, testing method, key files changed]
 
-## Current Task 
-[Exact thing we're working on right now - be specific]
-
-## Next 3 Actions
-1. [Immediate next step with clear success criteria]
-2. [Following step that depends on #1]
-3. [Step after that to maintain momentum]
-
-## Your Role
-[What the user needs to do, decide, provide, or approve]
-
-## My Role  
-[What I'm actively handling in the next steps]
-
-## System State
-[Current deployment status, what's working, what's broken, key URLs/credentials]
-
-## Context Preservation
-[Critical momentum items that must not be lost in handoffs]
+## 🔧 CRITICAL [TOOL] COMMAND GOTCHAS
+[Wrong vs correct commands for Railway, SSH, etc.]
 ```
 
-### Enforcement Rules:
-- **Never skip SESSION.md updates** - This is how we maintain continuity across context compactions
-- **Be specific** - "Fixed authentication" is bad, "Updated GitHub App installation ID to 75797595, now Billy can read config files" is good  
-- **Include concrete next steps** - Vague plans break momentum
-- **Update after every major step** - Don't batch updates
-- **Template compliance required** - Fill out every section or you're not following protocols
+#### 6. Anti-Patterns to Avoid
+- ❌ **Flying off the rails** - stick to the step-by-step checklist
+- ❌ **Manual testing as success** - only complete automation counts
+- ❌ **Assumptions without testing** - prove each step works
+- ❌ **Rediscovering documented solutions** - check SESSION.md first
+- ❌ **Vague documentation** - be specific with commands and gotchas
 
-This system ensures continuous momentum and context preservation across all agent handoffs and context compactions.
+#### 7. Working Cadence Structure
+Every response MUST follow:
+1. **What We Just Did** - Specific accomplishments with concrete results
+2. **What We're Doing Next** - Current exact step in the checklist
+3. **Your Part** - What user needs to approve/provide
+4. **My Part** - Specific action I'm taking next
+
+### Enforcement Rules:
+- **SESSION.md is source of truth** - contains all proven steps and gotchas
+- **Never deviate from methodology** - issue-by-issue, fix automation, document gotchas
+- **Complete automation is only success** - no manual work counts
+- **Document everything for future agents** - prevent rediscovery cycles
+- **Update SESSION.md after every issue fixed** - maintain living documentation
+
+This methodology prevents losing progress after context compaction and ensures continuous forward momentum on Billy's automation.
 
 ## ⚠️ **DANGER MODE: SKIP PERMISSIONS ENABLED** ⚠️
 

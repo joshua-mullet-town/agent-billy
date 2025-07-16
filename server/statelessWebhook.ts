@@ -714,6 +714,14 @@ ansible_ssh_common_args='-o StrictHostKeyChecking=no'`;
     // Get vault password
     const vaultPassword = process.env.ANSIBLE_VAULT_PASSWORD || '';
     
+    // Prepare issue context for autonomous implementation
+    const issueContext = {
+      repository: `${owner}/${repo}`,
+      number: issue.number,
+      title: issue.title.replace(/"/g, '\\"'), // Escape quotes for bash
+      body: issue.body?.replace(/"/g, '\\"') || 'No description provided'
+    };
+    
     return `#cloud-config
 users:
   - name: ubuntu
@@ -771,6 +779,33 @@ write_files:
       # Run Ansible playbook locally
       echo "$(date): Running Ansible playbook locally on VM..." >> /home/ubuntu/billy-ansible.log
       ansible-playbook ansible-playbook.yml -i inventory.yml --vault-password-file .vault_pass -v >> /home/ubuntu/billy-ansible.log 2>&1
+      
+      # After environment setup, trigger autonomous implementation
+      if [ $? -eq 0 ]; then
+        echo "$(date): Environment setup complete, starting autonomous implementation..." >> /home/ubuntu/billy-ansible.log
+        cd /home/ubuntu/GiveGrove
+        
+        # Pass issue context to Claude CLI for autonomous implementation
+        echo "$(date): Reading GitHub issue and implementing changes..." >> /home/ubuntu/billy-ansible.log
+        claude --timeout 600 "You are Agent Billy working on GitHub issue. 
+        
+        ISSUE DETAILS:
+        Repository: ${issueContext.repository}
+        Issue Number: ${issueContext.number}
+        Issue Title: ${issueContext.title}
+        Issue Body: ${issueContext.body}
+        
+        TASK: Complete the autonomous implementation workflow:
+        1. Read and understand the issue requirements
+        2. Make the requested code changes (add 'Hello World' to README.md line 1)
+        3. Test the changes using Playwright MCP (navigate to localhost:3000/tuna and validate)
+        4. Create a pull request with the changes
+        5. Report completion status
+        
+        Work directly in the current directory (/home/ubuntu/GiveGrove) and use the configured development environment." >> /home/ubuntu/billy-autonomous.log 2>&1
+        
+        echo "$(date): Autonomous implementation completed with exit code: $?" >> /home/ubuntu/billy-ansible.log
+      fi
       
       # Check success and write completion status
       if [ $? -eq 0 ]; then

@@ -196,18 +196,22 @@
       debug:
         msg: "Claude Code CLI authentication: {{ 'SUCCESS' if claude_auth_test.rc == 0 else 'FAILED' }} - {{ claude_auth_test.stdout }} {{ claude_auth_test.stderr }}"
 
-    # 7. INSTALL ALL DEPENDENCIES
-    - name: Install frontend dependencies
-      npm:
-        path: "{{ workspace_dir }}"
-        state: present
+    # 7. INSTALL ALL DEPENDENCIES (FIXED: Using --ignore-scripts to bypass chromedriver/phantomjs failures)
+    - name: Install frontend dependencies with --ignore-scripts
+      shell: |
+        cd {{ workspace_dir }}
+        npm install --ignore-scripts
       become_user: ubuntu
+      environment:
+        HOME: "/home/ubuntu"
 
-    - name: Install backend dependencies
-      npm:
-        path: "{{ workspace_dir }}/functions"
-        state: present
+    - name: Install backend dependencies with --ignore-scripts
+      shell: |
+        cd {{ workspace_dir }}/functions
+        npm install --ignore-scripts
       become_user: ubuntu
+      environment:
+        HOME: "/home/ubuntu"
 
     # 7.1. SETUP CLAUDE CODE WITH PLAYWRIGHT MCP
     - name: Add Playwright MCP server to Claude Code

@@ -515,8 +515,8 @@ echo "Automation script ready" >> /home/ubuntu/billy-status.log`
           '-o', 'StrictHostKeyChecking=no',
           '-o', 'ConnectTimeout=10', 
           `ubuntu@${vmIp}`,
-          // Critical: Use disown to completely detach from Railway session
-          'nohup /home/ubuntu/automation.sh > /home/ubuntu/automation.log 2>&1 & disown; echo "AUTOMATION_STARTED"; exit 0'
+          // Critical: Start background process and exit immediately (Railway independence)
+          'nohup /home/ubuntu/automation.sh > /home/ubuntu/automation.log 2>&1 & echo "AUTOMATION_STARTED"; exit 0'
         ], { stdio: 'pipe' });
 
         let output = '';

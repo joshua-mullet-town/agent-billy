@@ -281,4 +281,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Remember:** You are not building a script. You are scaffolding a dev teammate. 🤖✨
+**Remember:** You are not building a script. You are scaffolding a dev teammate. 🤖✨# Restart Billy to debug cloud-init detection

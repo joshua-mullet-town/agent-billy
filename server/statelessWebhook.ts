@@ -731,7 +731,7 @@ packages:
 
 write_files:
   - path: /home/ubuntu/.vault_pass
-    content: ${vaultPassword}
+    content: "${vaultPassword}"
     owner: ubuntu:ubuntu
     permissions: '0600'
   - path: /home/ubuntu/inventory.yml

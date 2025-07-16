@@ -384,11 +384,14 @@ This philosophy ensures we build something genuinely reliable rather than someth
 - ❌ **NOT SUCCESS**: Manual fixes, partial testing, "it should work" 
 - ❌ **NOT SUCCESS**: Component testing without full end-to-end flow
 
-#### 4. Documentation Standards
+#### 4. MANDATORY Real-Time Documentation 
+- **Document EVERY success/failure AS YOU HIT THEM** - don't wait, don't batch
+- **Update SESSION.md immediately** when you discover issues or breakthroughs
 - **Document ALL gotchas** with exact commands and solutions
 - **Include specific failures** (wrong commands, wrong approaches)
 - **Provide working alternatives** with code examples
 - **Explain WHY solutions work** to prevent regression
+- **Mark steps as ✅ WORKING or ❌ FAILING** with specific evidence
 
 #### 5. SESSION.md Structure (MANDATORY)
 ```markdown
@@ -408,6 +411,8 @@ This philosophy ensures we build something genuinely reliable rather than someth
 - ❌ **Assumptions without testing** - prove each step works
 - ❌ **Rediscovering documented solutions** - check SESSION.md first
 - ❌ **Vague documentation** - be specific with commands and gotchas
+- ❌ **Batching documentation** - document immediately, not at end
+- ❌ **Skipping gotcha documentation** - every failure/success must be recorded
 
 #### 7. Working Cadence Structure
 Every response MUST follow:
@@ -421,7 +426,17 @@ Every response MUST follow:
 - **Never deviate from methodology** - issue-by-issue, fix automation, document gotchas
 - **Complete automation is only success** - no manual work counts
 - **Document everything for future agents** - prevent rediscovery cycles
-- **Update SESSION.md after every issue fixed** - maintain living documentation
+- **Update SESSION.md IMMEDIATELY when hitting successes/failures** - real-time documentation
+- **Mark each step ✅ WORKING or ❌ FAILING with evidence** - no ambiguity allowed
+
+### CRITICAL SUCCESS PATTERN (PRESERVE THIS):
+```
+1. Hit automation issue → Document immediately in SESSION.md
+2. Identify specific root cause → Document with evidence  
+3. Fix automation code → Document what was changed
+4. Test end-to-end → Document results (✅ or ❌)
+5. Move to next step → Repeat documentation cycle
+```
 
 This methodology prevents losing progress after context compaction and ensures continuous forward momentum on Billy's automation.
 

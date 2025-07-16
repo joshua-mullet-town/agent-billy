@@ -368,47 +368,44 @@ I'm now implementing this feature using a dedicated development environment.
 
 *Executing ansible/claude-code-environment.yml...*`);
 
-      // Run Ansible playbook to setup complete development environment
-      const ansibleSuccess = await this.runAnsiblePlaybook(readyVM.publicIp || 'unknown', owner, repo, playbookPath);
-      
-      if (ansibleSuccess) {
-        await this.actions.commentOnIssue(owner, repo, issue.number, 
-          `✅ **Development Environment Ready!**
-          
-**Environment Status:**
-- ✅ VM provisioned and configured
-- ✅ Node.js, npm, Firebase CLI installed
-- ✅ Claude Code CLI + Playwright MCP configured
-- ✅ GUI environment with VNC ready
-- ✅ GiveGrove repository cloned and built
+      // NEW ARCHITECTURE: VM self-configures via cloud-init (Railway timeout immune)
+      await this.actions.commentOnIssue(owner, repo, issue.number, 
+        `🚀 **VM Self-Configuration Started!**
+        
+**New Cloud-Init Architecture:**
+- ✅ VM created with enhanced cloud-init script
+- 🔄 VM downloading and running Ansible playbook locally
+- ⏱️ **Railway timeout immunity**: VM configures itself independently
+- 📊 **Monitor via SSH**: Use \`ssh ubuntu@${readyVM.publicIp}\` to check progress
 
-**Ready for Development:**
-- 🌐 Frontend: http://${readyVM.publicIp}:3000
-- 🔧 Backend: http://${readyVM.publicIp}:4000
-- 🖥️  VNC Access: ${readyVM.publicIp}:5900
+**VM Self-Configuration Process:**
+1. 📥 Download Ansible playbook and secrets from Railway
+2. 🔧 Install Ansible and run playbook locally on VM
+3. 📦 Setup complete GiveGrove development environment
+4. 🎯 Ready for autonomous implementation
 
-Billy is now ready to execute development tasks autonomously!`);
+**SSH Monitoring Commands:**
+\`\`\`bash
+# Check configuration progress
+ssh ubuntu@${readyVM.publicIp} "tail -f /var/log/billy-ansible.log"
 
-        await this.actions.addLabel(owner, repo, issue.number, 'billy-vm-ready');
-      } else {
-        await this.actions.commentOnIssue(owner, repo, issue.number, 
-          `⚠️ **VM Created but Ansible Setup Failed**
-          
-**VM Status:**
-- ✅ VM is running at ${readyVM.publicIp}
-- ❌ Ansible playbook execution failed
-- ⚠️ Development environment incomplete
+# Verify completion status  
+ssh ubuntu@${readyVM.publicIp} "cat /var/log/billy-completion-status.log"
+
+# Check services
+ssh ubuntu@${readyVM.publicIp} "ps aux | grep -E '(vite|firebase|claude)'"
+\`\`\`
 
 **Next Steps:**
-- Check Ansible playbook logs
-- Verify repository configuration
-- Manual setup may be required
+- Railway job ending (timeout immunity achieved!)
+- VM continuing configuration independently
+- Use SSH commands above to monitor progress
+- Expected completion time: 10-15 minutes
 
-*VM available for debugging at ${readyVM.publicIp}*`);
+---
+*Agent Billy VM Self-Configuration (Cloud-Init Architecture)*`);
 
-        await this.actions.addLabel(owner, repo, issue.number, 'billy-vm-partial');
-      }
-
+      await this.actions.addLabel(owner, repo, issue.number, 'billy-vm-configuring');
       await this.actions.removeLabel(owner, repo, issue.number, 'for-billy');
       
       console.log(`✅ VM workflow initiated for issue #${issue.number}, VM ID: ${vm.id}`);
@@ -712,9 +709,23 @@ ansible_ssh_common_args='-o StrictHostKeyChecking=no'`;
     }
   }
 
-  // PHASE 1: Minimal cloud-config - ONLY SSH keys + basic packages
-  // Everything else moved to Ansible for better error reporting
+  // CLOUD-INIT SELF-CONFIGURATION: VM downloads and runs Ansible locally (Railway timeout immune)
   private generateVMSetupScript(owner: string, repo: string, playbookPath: string, issue: any): string {
+    // Base64 encode the Ansible playbook content to embed in cloud-init
+    const fs = require('fs');
+    const path = require('path');
+    
+    // Read and encode the Ansible playbook
+    const playbookContent = fs.readFileSync(path.join(process.cwd(), playbookPath), 'utf8');
+    const playbookBase64 = Buffer.from(playbookContent).toString('base64');
+    
+    // Read and encode the secrets file
+    const secretsContent = fs.readFileSync(path.join(process.cwd(), 'secrets.yml'), 'utf8');
+    const secretsBase64 = Buffer.from(secretsContent).toString('base64');
+    
+    // Get vault password
+    const vaultPassword = process.env.ANSIBLE_VAULT_PASSWORD || '';
+    
     return `#cloud-config
 users:
   - name: ubuntu
@@ -724,21 +735,88 @@ users:
 
 packages:
   - python3
+  - python3-pip
   - git
   - curl
   - wget
-  - build-essential
+  - ansible-core
+
+write_files:
+  - path: /home/ubuntu/ansible-playbook.yml
+    content: |
+      ${playbookBase64}
+    encoding: b64
+    owner: ubuntu:ubuntu
+    permissions: '0644'
+  - path: /home/ubuntu/secrets.yml
+    content: |
+      ${secretsBase64}
+    encoding: b64
+    owner: ubuntu:ubuntu
+    permissions: '0600'
+  - path: /home/ubuntu/.vault_pass
+    content: ${vaultPassword}
+    owner: ubuntu:ubuntu
+    permissions: '0600'
+  - path: /home/ubuntu/inventory.yml
+    content: |
+      [vm_instance]
+      localhost ansible_connection=local
+    owner: ubuntu:ubuntu
+    permissions: '0644'
+  - path: /home/ubuntu/run-ansible.sh
+    content: |
+      #!/bin/bash
+      echo "$(date): Starting Billy VM self-configuration" > /var/log/billy-ansible.log
+      
+      cd /home/ubuntu
+      
+      # Install additional Ansible collections if needed
+      echo "$(date): Installing Ansible collections..." >> /var/log/billy-ansible.log
+      ansible-galaxy collection install community.general >> /var/log/billy-ansible.log 2>&1
+      
+      # Run Ansible playbook locally
+      echo "$(date): Running Ansible playbook locally on VM..." >> /var/log/billy-ansible.log
+      ansible-playbook ansible-playbook.yml -i inventory.yml --vault-password-file .vault_pass -v >> /var/log/billy-ansible.log 2>&1
+      
+      # Check success and write completion status
+      if [ $? -eq 0 ]; then
+        echo "$(date): SUCCESS - Billy VM configuration completed successfully!" > /var/log/billy-completion-status.log
+        echo "Status: READY" >> /var/log/billy-completion-status.log
+        echo "Services: All development environment components installed" >> /var/log/billy-completion-status.log
+        echo "Frontend: http://localhost:3000" >> /var/log/billy-completion-status.log
+        echo "Backend: http://localhost:4000" >> /var/log/billy-completion-status.log
+        echo "VNC: localhost:5900" >> /var/log/billy-completion-status.log
+      else
+        echo "$(date): FAILED - Billy VM configuration encountered errors" > /var/log/billy-completion-status.log
+        echo "Status: FAILED" >> /var/log/billy-completion-status.log
+        echo "Check: /var/log/billy-ansible.log for details" >> /var/log/billy-completion-status.log
+      fi
+      
+      echo "$(date): Billy VM self-configuration script completed" >> /var/log/billy-ansible.log
+    owner: ubuntu:ubuntu
+    permissions: '0755'
 
 runcmd:
-  - echo "Billy VM Phase 1 - Enhanced Setup Started" > /var/log/billy-setup.log
+  - echo "Billy VM Self-Configuration Started (Cloud-Init Architecture)" > /var/log/billy-setup.log
   - echo "SSH key installed successfully" >> /var/log/billy-setup.log
   - echo "Basic packages installed" >> /var/log/billy-setup.log
-  - echo "Installing Node.js 20 LTS..." >> /var/log/billy-setup.log
-  - curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-  - apt-get install -y nodejs
-  - echo "Node.js $(node --version) installed" >> /var/log/billy-setup.log
-  - echo "VM ready for SSH access and Ansible execution" >> /var/log/billy-setup.log
-  - echo "Enhanced setup completed" >> /var/log/billy-setup.log
+  - echo "Installing Node.js 20 via snap (most reliable)..." >> /var/log/billy-setup.log
+  - snap install node --classic --channel=20/stable >> /var/log/billy-setup.log 2>&1
+  - echo "Node.js $(/snap/bin/node --version) installed via snap" >> /var/log/billy-setup.log
+  - ln -sf /snap/bin/node /usr/local/bin/node >> /var/log/billy-setup.log 2>&1
+  - ln -sf /snap/bin/npm /usr/local/bin/npm >> /var/log/billy-setup.log 2>&1
+  - echo "Node.js symlinks created" >> /var/log/billy-setup.log
+  - echo "Node.js $(node --version) now accessible" >> /var/log/billy-setup.log
+  - echo "Installing build tools..." >> /var/log/billy-setup.log
+  - apt-get install -y build-essential >> /var/log/billy-setup.log 2>&1
+  - echo "Build tools installed" >> /var/log/billy-setup.log
+  - echo "Ansible installed via package manager" >> /var/log/billy-setup.log
+  - echo "Ansible playbook and secrets embedded in cloud-init" >> /var/log/billy-setup.log
+  - echo "Starting Ansible self-configuration (background process)..." >> /var/log/billy-setup.log
+  - su - ubuntu -c "/home/ubuntu/run-ansible.sh" &
+  - echo "Billy VM self-configuration initiated - check /var/log/billy-ansible.log for progress" >> /var/log/billy-setup.log
+  - echo "Cloud-init phase completed, Ansible running independently" >> /var/log/billy-setup.log
 `;
   }
 

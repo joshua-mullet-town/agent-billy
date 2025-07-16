@@ -897,10 +897,16 @@ packages:
   - curl
   - wget
   - git
+  - snapd
 
 runcmd:
   - echo "Billy VM created at $(date)" > /home/ubuntu/billy-status.log
   - echo "SSH access ready" >> /home/ubuntu/billy-status.log
+  - echo "Installing Node.js 20..." >> /home/ubuntu/billy-status.log
+  - snap install node --classic --channel=20/stable
+  - ln -sf /snap/bin/node /usr/local/bin/node
+  - ln -sf /snap/bin/npm /usr/local/bin/npm
+  - echo "Node.js installation complete" >> /home/ubuntu/billy-status.log
   - echo "Waiting for Railway kickoff..." >> /home/ubuntu/billy-status.log`;
   }
 

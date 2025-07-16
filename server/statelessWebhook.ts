@@ -789,8 +789,8 @@ write_files:
         echo "$(date): Reading GitHub issue and implementing changes..." >> /home/ubuntu/billy-ansible.log
         echo "Repository: ${issueContext.repository}" > /home/ubuntu/issue-context.txt
         echo "Issue Number: ${issueContext.number}" >> /home/ubuntu/issue-context.txt
-        echo "Issue Title: ${issueContext.title}" >> /home/ubuntu/issue-context.txt
-        echo "Issue Body: ${issueContext.body}" >> /home/ubuntu/issue-context.txt
+        echo 'Issue Title: ${issueContext.title}' >> /home/ubuntu/issue-context.txt
+        echo 'Issue Body: ${issueContext.body}' >> /home/ubuntu/issue-context.txt
         
         claude --timeout 600 "You are Agent Billy working on GitHub issue. Read the issue details from /home/ubuntu/issue-context.txt and complete the autonomous implementation workflow: 1. Make the requested code changes (add Hello World to README.md line 1) 2. Test changes using Playwright MCP (navigate to localhost:3000/tuna) 3. Create pull request. Work in /home/ubuntu/GiveGrove directory." >> /home/ubuntu/billy-autonomous.log 2>&1
         

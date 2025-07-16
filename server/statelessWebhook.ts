@@ -741,22 +741,22 @@ write_files:
   - path: /home/ubuntu/run-ansible.sh
     content: |
       #!/bin/bash
-      echo "$(date): Starting Billy VM self-configuration" > /var/log/billy-ansible.log
+      echo "$(date): Starting Billy VM self-configuration" > /home/ubuntu/billy-ansible.log
       
       cd /home/ubuntu
       
       # Download Ansible playbook and secrets from Billy repo (public files)
-      echo "$(date): Downloading Ansible playbook from Billy repository..." >> /var/log/billy-ansible.log
-      curl -sL "https://raw.githubusercontent.com/south-bend-code-works/agent-billy/main/test-complete-environment.yml" -o ansible-playbook.yml >> /var/log/billy-ansible.log 2>&1
+      echo "$(date): Downloading Ansible playbook from Billy repository..." >> /home/ubuntu/billy-ansible.log
+      curl -sL "https://raw.githubusercontent.com/joshua-mullet-town/agent-billy/main/test-complete-environment.yml" -o ansible-playbook.yml >> /home/ubuntu/billy-ansible.log 2>&1
       if [ $? -ne 0 ]; then
-        echo "$(date): FAILED to download playbook from Billy repo" >> /var/log/billy-ansible.log
+        echo "$(date): FAILED to download playbook from Billy repo" >> /home/ubuntu/billy-ansible.log
         exit 1
       fi
       
-      echo "$(date): Downloading secrets from Billy repository..." >> /var/log/billy-ansible.log  
-      curl -sL "https://raw.githubusercontent.com/south-bend-code-works/agent-billy/main/secrets.yml" -o secrets.yml >> /var/log/billy-ansible.log 2>&1
+      echo "$(date): Downloading secrets from Billy repository..." >> /home/ubuntu/billy-ansible.log  
+      curl -sL "https://raw.githubusercontent.com/joshua-mullet-town/agent-billy/main/secrets.yml" -o secrets.yml >> /home/ubuntu/billy-ansible.log 2>&1
       if [ $? -ne 0 ]; then
-        echo "$(date): FAILED to download secrets from Billy repo" >> /var/log/billy-ansible.log
+        echo "$(date): FAILED to download secrets from Billy repo" >> /home/ubuntu/billy-ansible.log
         exit 1
       fi
       
@@ -765,12 +765,12 @@ write_files:
       chmod 644 ansible-playbook.yml
       
       # Install additional Ansible collections if needed
-      echo "$(date): Installing Ansible collections..." >> /var/log/billy-ansible.log
-      ansible-galaxy collection install community.general >> /var/log/billy-ansible.log 2>&1
+      echo "$(date): Installing Ansible collections..." >> /home/ubuntu/billy-ansible.log
+      ansible-galaxy collection install community.general >> /home/ubuntu/billy-ansible.log 2>&1
       
       # Run Ansible playbook locally
-      echo "$(date): Running Ansible playbook locally on VM..." >> /var/log/billy-ansible.log
-      ansible-playbook ansible-playbook.yml -i inventory.yml --vault-password-file .vault_pass -v >> /var/log/billy-ansible.log 2>&1
+      echo "$(date): Running Ansible playbook locally on VM..." >> /home/ubuntu/billy-ansible.log
+      ansible-playbook ansible-playbook.yml -i inventory.yml --vault-password-file .vault_pass -v >> /home/ubuntu/billy-ansible.log 2>&1
       
       # Check success and write completion status
       if [ $? -eq 0 ]; then
@@ -786,7 +786,7 @@ write_files:
         echo "Check: /var/log/billy-ansible.log for details" >> /var/log/billy-completion-status.log
       fi
       
-      echo "$(date): Billy VM self-configuration script completed" >> /var/log/billy-ansible.log
+      echo "$(date): Billy VM self-configuration script completed" >> /home/ubuntu/billy-ansible.log
     permissions: '0755'
 
 runcmd:

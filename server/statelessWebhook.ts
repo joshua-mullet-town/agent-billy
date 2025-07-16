@@ -774,7 +774,7 @@ write_files:
       
       # Install additional Ansible collections if needed
       echo "$(date): Installing Ansible collections..." >> /home/ubuntu/billy-ansible.log
-      ansible-galaxy collection install community.general >> /home/ubuntu/billy-ansible.log 2>&1
+      ansible-galaxy collection install community.general --force >> /home/ubuntu/billy-ansible.log 2>&1
       
       # Run Ansible playbook locally
       echo "$(date): Running Ansible playbook locally on VM..." >> /home/ubuntu/billy-ansible.log
@@ -809,16 +809,16 @@ write_files:
       
       # Check success and write completion status
       if [ $? -eq 0 ]; then
-        echo "$(date): SUCCESS - Billy VM configuration completed successfully!" > /var/log/billy-completion-status.log
-        echo "Status: READY" >> /var/log/billy-completion-status.log
-        echo "Services: All development environment components installed" >> /var/log/billy-completion-status.log
-        echo "Frontend: http://localhost:3000" >> /var/log/billy-completion-status.log
-        echo "Backend: http://localhost:4000" >> /var/log/billy-completion-status.log
-        echo "VNC: localhost:5900" >> /var/log/billy-completion-status.log
+        echo "$(date): SUCCESS - Billy VM configuration completed successfully!" > /home/ubuntu/billy-completion-status.log
+        echo "Status: READY" >> /home/ubuntu/billy-completion-status.log
+        echo "Services: All development environment components installed" >> /home/ubuntu/billy-completion-status.log
+        echo "Frontend: http://localhost:3000" >> /home/ubuntu/billy-completion-status.log
+        echo "Backend: http://localhost:4000" >> /home/ubuntu/billy-completion-status.log
+        echo "VNC: localhost:5900" >> /home/ubuntu/billy-completion-status.log
       else
-        echo "$(date): FAILED - Billy VM configuration encountered errors" > /var/log/billy-completion-status.log
-        echo "Status: FAILED" >> /var/log/billy-completion-status.log
-        echo "Check: /var/log/billy-ansible.log for details" >> /var/log/billy-completion-status.log
+        echo "$(date): FAILED - Billy VM configuration encountered errors" > /home/ubuntu/billy-completion-status.log
+        echo "Status: FAILED" >> /home/ubuntu/billy-completion-status.log
+        echo "Check: /home/ubuntu/billy-ansible.log for details" >> /home/ubuntu/billy-completion-status.log
       fi
       
       echo "$(date): Billy VM self-configuration script completed" >> /home/ubuntu/billy-ansible.log

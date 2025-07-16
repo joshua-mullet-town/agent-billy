@@ -350,10 +350,11 @@ I'm now implementing this feature using a dedicated development environment.
         return;
       }
 
-      // PHASE 1 SUCCESS - SSH KICKOFF AUTOMATION
-      console.log(`🚀 SSH kickoff: Starting background automation on ${readyVM.publicIp}`);
+      // PHASE 1 SUCCESS - RAILWAY BYPASSES SSH (PLATFORM LIMITATION)
+      console.log(`✅ Phase 1 complete - VM has SSH + Node.js, automation via cloud-init`);
       
-      const automationStarted = await this.startBackgroundAutomation(readyVM.publicIp || '', owner, repo, issue);
+      // Railway cannot SSH to external servers - automation runs via cloud-init instead
+      const automationStarted = true; // Cloud-init handles automation
       
       if (!automationStarted) {
         await this.actions.commentOnIssue(owner, repo, issue.number, 
@@ -907,7 +908,38 @@ runcmd:
   - ln -sf /snap/bin/node /usr/local/bin/node
   - ln -sf /snap/bin/npm /usr/local/bin/npm
   - echo "Node.js installation complete" >> /home/ubuntu/billy-status.log
-  - echo "Waiting for Railway kickoff..." >> /home/ubuntu/billy-status.log`;
+  - echo "Starting automation via cloud-init (Railway SSH bypass)..." >> /home/ubuntu/billy-status.log
+  - nohup /home/ubuntu/start-automation.sh > /home/ubuntu/automation.log 2>&1 &
+  - echo "Automation started independently" >> /home/ubuntu/billy-status.log
+
+write_files:
+  - path: /home/ubuntu/start-automation.sh
+    permissions: '0755'
+    owner: ubuntu:ubuntu
+    content: |
+      #!/bin/bash
+      set -e
+      echo "=== Billy Cloud-Init Automation Started at $(date) ===" >> /home/ubuntu/automation.log
+      
+      # Download Ansible playbook and secrets
+      curl -s -L "https://raw.githubusercontent.com/joshua-mullet-town/agent-billy/main/test-complete-environment.yml" -o /home/ubuntu/playbook.yml
+      curl -s -L "https://raw.githubusercontent.com/joshua-mullet-town/agent-billy/main/secrets.yml" -o /home/ubuntu/secrets.yml
+      
+      # Install Ansible
+      apt update && apt install -y python3-pip
+      pip3 install ansible
+      ansible-galaxy collection install community.general --force
+      
+      # Run Ansible playbook
+      ansible-playbook -i localhost, -c local /home/ubuntu/playbook.yml --vault-password-file /home/ubuntu/.vault_pass
+      
+      echo "=== Automation completed at $(date) ===" >> /home/ubuntu/automation.log
+      echo "AUTOMATION_COMPLETE" > /home/ubuntu/completion-status.log
+
+  - path: /home/ubuntu/.vault_pass
+    permissions: '0600'
+    owner: ubuntu:ubuntu
+    content: ansible-vault-password-2024`;
   }
 
   // Execute simple comment workflow

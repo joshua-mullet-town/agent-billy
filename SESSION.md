@@ -51,7 +51,15 @@ Railway platform **restricts outbound SSH connections from containers**. This is
 - ✅ SSH from local machine to VMs works perfectly (for debugging)
 - ✅ Billy bypasses SSH testing in Railway environment
 
-**FOR FUTURE AGENTS**: DO NOT debug SSH connectivity from Railway - focus on Ansible execution instead.
+**🚨 CRITICAL FOR FUTURE AGENTS 🚨**: 
+**NEVER IMPLEMENT SSH KICKOFF FROM RAILWAY**
+- ❌ **DO NOT** try to SSH from Railway to VMs for automation
+- ❌ **DO NOT** implement startBackgroundAutomation() via SSH
+- ✅ **ALWAYS USE** cloud-init with write_files + runcmd for automation
+- ✅ **RAILWAY'S JOB**: Create VM with cloud-init, then exit cleanly
+- ✅ **VM'S JOB**: Self-configure via cloud-init automation scripts
+
+**ARCHITECTURE RULE**: Railway → VM creation → VM self-automation (no SSH dependency)
 
 ---
 
@@ -661,48 +669,48 @@ railway variables --set SSH_PRIVATE_KEY=$(cat ~/.ssh/id_ed25519 | base64 | tr -d
 This SESSION.md is your complete reference guide. Steps 1-4B are proven working. Steps 5-11 have not been reached due to Railway timeout limits. All critical gotchas are documented above - use them to avoid rediscovering the same issues after context compaction.
 
 ## What We Just Did
-**CURRENT TEST IN PROGRESS**: Step-by-step monitoring of timeout-immune approach
-- 🎉 **SSH SUCCESS**: Confirmed working on VMs 104.131.93.45, 64.225.21.4, 165.227.210.77 
-- 🔧 **TIMEOUT FIX**: Deployed `nohup automation.sh & echo 'STARTED'; exit 0` approach
-- ✅ **VM CREATED**: Billy created VM 165.227.210.77 at 21:18:52Z, SSH access confirmed
-- ⏳ **WAITING**: Billy in Phase 1 readiness check, hasn't reached SSH kickoff yet
-- 📊 **STATUS**: No automation script uploaded yet, monitoring Billy's progress step-by-step
+**RAILWAY SSH RESTRICTION REDISCOVERED + ARCHITECTURE FIXED**: Back to cloud-init approach
+- 📚 **DOCS CHECKED**: Found existing solution - Railway restricts outbound SSH to external servers
+- ❌ **SSH KICKOFF WRONG**: We implemented SSH approach despite knowing Railway blocks it
+- ✅ **ARCHITECTURE CORRECTED**: Switched back to cloud-init automation (no SSH needed)
+- 🔧 **COMPLETE AUTOMATION**: Put entire automation script in cloud-init write_files + runcmd
+- 🎯 **RAILWAY COMPATIBLE**: VM self-configures without Railway SSH dependency
 
 ## What We're Doing Next  
-**FINAL TEST: COMPLETE END-TO-END AUTOMATION**: All blockers solved, testing full pipeline
-- 🎯 **Test Strategy**: Trigger Billy with timeout-immune hybrid approach (commit 80b9a49)
-- 🔥 **Expected Flow**: VM creation → SSH kickoff (10s) → Railway exits → VM automation (independent)
-- 📊 **Success Criteria**: Railway completes cleanly + VM runs full Ansible + autonomous implementation + PR creation
-- 🚀 **Game Changer**: First time Railway timeout is NOT a blocker - VM has unlimited time
+**TESTING CLOUD-INIT AUTOMATION**: Railway-compatible architecture without SSH dependency
+- 🎯 **Deploy Fixed Code**: Cloud-init automation approach (no SSH kickoff needed)
+- 🔧 **Architecture**: Railway creates VM → cloud-init runs automation → Railway exits cleanly
+- ⏳ **Test Strategy**: Trigger Billy and verify VM self-configures via cloud-init alone
+- 📊 **Success Criteria**: Complete automation without any Railway SSH attempts
 
 ## Your Part
-Witness the first complete automation success:
-- Confirm the timeout-immune approach makes sense: Railway exits after 10s kickoff
-- Watch Billy create VM, start automation, and exit cleanly  
-- Verify VM continues full automation independently for hours if needed
-- Celebrate when we get the first automated pull request! 🎉
+Approve the corrected Railway-compatible architecture:
+- **Railway SSH Restriction**: Confirmed platform limitation - no outbound SSH allowed
+- **Architecture Fix**: Cloud-init automation eliminates SSH dependency entirely  
+- **No More SSH Issues**: VM self-configures, Railway just creates and exits
+- **Ready to Test**: Corrected approach should work without Railway SSH problems
 
 ## My Part  
-**COMPLETE AUTOMATION TESTING**: 
-1. Trigger Billy and monitor Railway logs for clean SSH kickoff and exit
-2. Verify VM receives automation script and starts background execution
-3. SSH monitor VM automation progress (Ansible, environment setup, Claude CLI)
-4. Track autonomous implementation and PR creation
-5. Document the first complete end-to-end automation success! 🚀
+**CLOUD-INIT AUTOMATION TESTING**: 
+1. Deploy corrected cloud-init approach and trigger Billy
+2. Verify Railway creates VM and exits cleanly (no SSH attempts)
+3. SSH monitor VM cloud-init automation progress independently  
+4. Validate complete automation via cloud-init without Railway dependency
+5. Document Railway-compatible automation success! 🚀
 
 ## System State
-- **Railway**: Timeout-immune approach deployed (commit 80b9a49) ✅
-- **SSH**: Confirmed working on multiple VMs (104.131.93.45, 64.225.21.4) ✅
-- **Background Execution**: Manual test confirmed nohup + exit approach works ✅
-- **Ready**: All technical blockers solved - SSH access + Railway timeout immunity ✅
-- **Next**: Trigger final test and achieve first complete automation success 🎯
+- **Railway**: Cloud-init automation approach implemented (no SSH dependency) ✅
+- **Architecture**: Railway creates VM → cloud-init handles automation → Railway exits ✅
+- **SSH Restriction**: Documented and solved - never use SSH from Railway ✅
+- **Ready**: Railway-compatible approach ready for testing ✅
+- **Next**: Deploy and test cloud-init automation (first complete success expected) 🎯
 
 ## Context Preservation
 
-**HYBRID SSH KICKOFF STRATEGY (2025-07-16)**: Revolutionary new approach implemented to solve persistent SSH issues
-- **Problem**: All previous VMs failed SSH access regardless of cloud-config complexity 
-- **Solution**: Minimal SSH-only cloud-config + Railway SSH kickoff + VM background automation
-- **Key Innovation**: Separates SSH access (simple) from automation complexity (background script)
-- **Benefits**: Solves both SSH embedding issues AND Railway timeout constraints
-- **Status**: Currently testing - Billy creating VM with hybrid approach (commit eccaf3e)
-- **For Future Agents**: If this works, it's the permanent solution. If it fails, SSH key format itself is the issue.
+**🚨 RAILWAY SSH RESTRICTION - PERMANENT LESSON (2025-07-16) 🚨**
+- **Problem**: Implemented SSH kickoff approach despite docs saying Railway blocks outbound SSH
+- **Root Cause**: Railway platform restrictions prevent SSH to external servers (intentional limitation)
+- **Wrong Solution**: SSH kickoff from Railway (will always fail due to platform restrictions)
+- **Correct Solution**: Cloud-init automation with write_files + runcmd (no SSH dependency)
+- **Architecture**: Railway creates VM → cloud-init runs automation → Railway exits cleanly
+- **For Future Agents**: NEVER try SSH from Railway. Always use cloud-init for automation. This lesson cost hours to relearn.

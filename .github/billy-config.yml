@@ -1,0 +1,5 @@
+billy:
+  workflow_type: "vm_development"
+  vm_development:
+    vm_size: "c-4"
+    ansible_playbook: "test-complete-environment.yml"

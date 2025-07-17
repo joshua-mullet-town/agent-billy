@@ -904,10 +904,13 @@ runcmd:
   - echo "Billy VM created at $(date)" > /home/ubuntu/billy-status.log
   - echo "SSH access ready" >> /home/ubuntu/billy-status.log
   - echo "Installing Node.js 20..." >> /home/ubuntu/billy-status.log
-  - snap install node --classic --channel=20/stable
-  - ln -sf /snap/bin/node /usr/local/bin/node
-  - ln -sf /snap/bin/npm /usr/local/bin/npm
+  - curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+  - sudo apt-get install -y nodejs
   - echo "Node.js installation complete" >> /home/ubuntu/billy-status.log
+  - echo "Setting up automation files..." >> /home/ubuntu/billy-status.log
+  - chown ubuntu:ubuntu /home/ubuntu/start-automation.sh /home/ubuntu/.vault_pass
+  - chmod +x /home/ubuntu/start-automation.sh
+  - chmod 600 /home/ubuntu/.vault_pass
   - echo "Starting automation via cloud-init (Railway SSH bypass)..." >> /home/ubuntu/billy-status.log
   - nohup /home/ubuntu/start-automation.sh > /home/ubuntu/automation.log 2>&1 &
   - echo "Automation started independently" >> /home/ubuntu/billy-status.log
@@ -915,7 +918,6 @@ runcmd:
 write_files:
   - path: /home/ubuntu/start-automation.sh
     permissions: '0755'
-    owner: ubuntu:ubuntu
     content: |
       #!/bin/bash
       set -e
@@ -926,19 +928,17 @@ write_files:
       curl -s -L "https://raw.githubusercontent.com/joshua-mullet-town/agent-billy/main/secrets.yml" -o /home/ubuntu/secrets.yml
       
       # Install Ansible
-      apt update && apt install -y python3-pip
-      pip3 install ansible
+      sudo apt update && sudo apt install -y python3-pip
+      sudo pip3 install ansible
       ansible-galaxy collection install community.general --force
       
       # Run Ansible playbook
       ansible-playbook -i localhost, -c local /home/ubuntu/playbook.yml --vault-password-file /home/ubuntu/.vault_pass
       
       echo "=== Automation completed at $(date) ===" >> /home/ubuntu/automation.log
-      echo "AUTOMATION_COMPLETE" > /home/ubuntu/completion-status.log
 
   - path: /home/ubuntu/.vault_pass
     permissions: '0600'
-    owner: ubuntu:ubuntu
     content: ansible-vault-password-2024`;
   }
 

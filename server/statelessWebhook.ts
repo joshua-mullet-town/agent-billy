@@ -887,6 +887,7 @@ ansible_ssh_common_args='-o StrictHostKeyChecking=no'`;
   private generateVMSetupScript(owner: string, repo: string, playbookPath: string, issue: any): string {
     // FIXED: Remove owner specifications from write_files - ubuntu user doesn't exist during init-network stage
     // FIXED: Use NodeSource APT instead of snap for Node.js installation
+    // DEPLOYMENT CHECK: 2025-07-17 12:05 - Force Railway cache refresh
     return `#cloud-config
 users:
   - name: ubuntu

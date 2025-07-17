@@ -885,8 +885,8 @@ ansible_ssh_common_args='-o StrictHostKeyChecking=no'`;
 
   // CLOUD-INIT SELF-CONFIGURATION: VM downloads files from GitHub and runs Ansible locally (Railway timeout immune)
   private generateVMSetupScript(owner: string, repo: string, playbookPath: string, issue: any): string {
-    // MINIMAL SSH + NODE.JS CLOUD-CONFIG 
-    // No complex automation - Railway will SSH in to start background processes
+    // FIXED: Remove owner specifications from write_files - ubuntu user doesn't exist during init-network stage
+    // FIXED: Use NodeSource APT instead of snap for Node.js installation
     return `#cloud-config
 users:
   - name: ubuntu

@@ -83,21 +83,27 @@ export class StatelessWebhookServer {
     const owner = repository.owner.login;
     const repo = repository.name;
 
-    console.log(`🤖 Billy processing issue #${issue.number} in ${owner}/${repo}`);
+    try {
+      console.log(`🤖 Billy processing issue #${issue.number} in ${owner}/${repo}`);
 
-    // Step 1: Read repository configuration
-    const config = await this.configReader.readRepositoryConfig(owner, repo);
+      // Step 1: Read repository configuration
+      console.log(`📋 Step 1: Reading repository config for ${owner}/${repo}`);
+      const config = await this.configReader.readRepositoryConfig(owner, repo);
+      console.log(`✅ Config read successfully. Workflow type: ${config?.billy?.workflow_type || 'simple_comment'}`);
 
-    // Step 2: Check if clarification is needed (with full context)
-    const clarificationCheck = await this.checkIfClarificationNeeded(issue, repository);
+      // Step 2: Check if clarification is needed (with full context)
+      console.log(`📋 Step 2: Checking if clarification needed for issue #${issue.number}`);
+      const clarificationCheck = await this.checkIfClarificationNeeded(issue, repository);
+      console.log(`✅ Clarification check complete. Needs clarification: ${clarificationCheck.needsClarification}`);
 
-    if (clarificationCheck.needsClarification) {
-      // Post clarification request
-      const comment = await this.actions.commentOnIssue(
-        owner,
-        repo,
-        issue.number,
-        `Hi @${issue.user.login}! 👋
+      if (clarificationCheck.needsClarification) {
+        // Post clarification request
+        console.log(`📋 Posting clarification request for issue #${issue.number}`);
+        const comment = await this.actions.commentOnIssue(
+          owner,
+          repo,
+          issue.number,
+          `Hi @${issue.user.login}! 👋
 
 I need some clarification before I can proceed with this issue.
 
@@ -107,16 +113,50 @@ Once you provide the clarification, I'll be able to help with the implementation
 
 Thanks!  
 Agent Billy 🤖`
-      );
+        );
 
-      if (comment) {
-        await this.actions.addLabel(owner, repo, issue.number, 'needs-clarification');
-        console.log(`❓ Billy requested clarification on issue #${issue.number}`);
+        if (comment) {
+          await this.actions.addLabel(owner, repo, issue.number, 'needs-clarification');
+          console.log(`❓ Billy requested clarification on issue #${issue.number}`);
+        } else {
+          console.error(`❌ Failed to post clarification comment on issue #${issue.number}`);
+        }
+      } else {
+        // Step 3: Billy is ready to implement - execute configured workflow
+        console.log(`🚀 Billy is ready to implement issue #${issue.number}`);
+        await this.executeImplementationWorkflow(issue, repository, config);
       }
-    } else {
-      // Step 3: Billy is ready to implement - execute configured workflow
-      console.log(`🚀 Billy is ready to implement issue #${issue.number}`);
-      await this.executeImplementationWorkflow(issue, repository, config);
+    } catch (error) {
+      console.error(`❌ CRITICAL ERROR in processIssue for #${issue.number}:`, error);
+      const err = error as Error;
+      console.error(`❌ Error details:`, {
+        message: err.message,
+        stack: err.stack,
+        name: err.name
+      });
+      
+      // Try to post error comment to issue
+      try {
+        await this.actions.commentOnIssue(
+          owner,
+          repo,
+          issue.number,
+          `❌ **Processing Error**
+
+I encountered an error while processing this issue:
+
+\`\`\`
+${err.message}
+\`\`\`
+
+Please check the logs and try again.
+
+---
+*Agent Billy Error Handler*`
+        );
+      } catch (commentError) {
+        console.error(`❌ Also failed to post error comment:`, commentError);
+      }
     }
   }
 
@@ -198,11 +238,13 @@ Let's get this done! 💪
     const owner = repository.owner.login;
     const repo = repository.name;
 
-    console.log(`🚀 Starting VM development workflow for issue #${issue.number}`);
+    try {
+      console.log(`🚀 Starting VM development workflow for issue #${issue.number}`);
 
-    // Post initial status comment
-    await this.actions.commentOnIssue(owner, repo, issue.number, 
-      `🚀 **Starting VM Development Workflow!**
+      // Post initial status comment
+      console.log(`📋 Step 3.1: Posting initial status comment for issue #${issue.number}`);
+      const initialComment = await this.actions.commentOnIssue(owner, repo, issue.number, 
+        `🚀 **Starting VM Development Workflow!**
 
 I'm now implementing this feature using a dedicated development environment.
 
@@ -220,16 +262,24 @@ I'm now implementing this feature using a dedicated development environment.
 ---
 *Agent Billy VM Development Workflow*`);
 
-    try {
+      if (!initialComment) {
+        console.error(`❌ Failed to post initial status comment for issue #${issue.number}`);
+        throw new Error('Failed to post initial status comment');
+      }
+      console.log(`✅ Initial status comment posted successfully for issue #${issue.number}`);
+
       // Initialize VM orchestrator
+      console.log(`📋 Step 3.2: Initializing VM orchestrator for issue #${issue.number}`);
       const vmOrchestrator = new VMOrchestrator();
       
       // Clean up old VMs first to avoid cost accumulation
-      console.log(`🧹 Cleaning up old VMs before creating new one...`);
+      console.log(`🧹 Step 3.3: Cleaning up old VMs before creating new one...`);
       await vmOrchestrator.destroyOldVMs('159.203.123.65'); // Keep current working VM
+      console.log(`✅ Old VMs cleanup completed`);
       
       // Generate unique VM name
       const vmName = `billy-${repo}-${issue.number}-${Date.now()}`.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+      console.log(`📋 Generated VM name: ${vmName}`);
       
       // Get VM config from repository config or use defaults  
       const vmSize = config?.billy.vm_development?.vm_size || 's-2vcpu-2gb';
@@ -240,6 +290,7 @@ I'm now implementing this feature using a dedicated development environment.
 
       // CRITICAL: Create VM with SSH key embedded in cloud-config (NOT via DigitalOcean API)
       // See CLAUDE.md "SSH Key Configuration" section for detailed explanation
+      console.log(`📋 Step 3.4: Creating VM with SSH-safe cloud-config...`);
       const vm = await vmOrchestrator.createVM({
         name: vmName,
         region: 'nyc3',
@@ -248,6 +299,7 @@ I'm now implementing this feature using a dedicated development environment.
         sshKeys: [], // NEVER use DigitalOcean SSH key management - unreliable
         userData: this.generateVMSetupScript(owner, repo, playbookPath, issue)
       });
+      console.log(`✅ VM created successfully with ID: ${vm.id}`);
 
       // Update issue with VM creation status
       await this.actions.commentOnIssue(owner, repo, issue.number, 
@@ -267,22 +319,22 @@ I'm now implementing this feature using a dedicated development environment.
       // Wait for VM to be ready
       const readyVM = await vmOrchestrator.waitForVM(vm.id, 10);
       
-      // Update with coordinator architecture status
+      // Update with honest VM status - coordinator setup via Ansible
       await this.actions.commentOnIssue(owner, repo, issue.number, 
-        `🤖 **VM Ready - Coordinator Workflow Starting!**
+        `🤖 **VM Ready - Ansible Setup Starting!**
         
 **VM Status:**
 - ✅ VM is running at ${readyVM.publicIp}
-- ✅ Cloud-init coordinator workflow deployed
-- ✅ Coordinator polling endpoint active
+- ✅ SSH access configured and verified
+- ✅ Basic packages installed (ansible, curl, wget, git, python3)
 
-**Coordinator Architecture:**
-- 🔄 VM polls coordinator for step-by-step guidance
-- 🤖 Claude CLI executes coordinator prompts autonomously  
-- 🧪 Playwright MCP integrated for testing
-- 📥 Pull request creation automated
+**Next Steps:**
+- 🔄 Ansible playbook will install coordinator workflow
+- 🔄 Claude CLI + Playwright MCP integration via Ansible
+- 🔄 Repository cloning and environment setup
+- 🔄 Coordinator polling logic deployment
 
-*Coordinator workflow initializing - autonomous implementation starting...*`);
+*Ansible automation starting - comprehensive environment setup in progress...*`);
 
       // Create SSH key file with proper base64 decoding (SOLUTION TO PERSISTENT SSH ISSUE)
       const fs = require('fs');
@@ -869,14 +921,11 @@ ansible_ssh_common_args='-o StrictHostKeyChecking=no'`;
     }
   }
 
-  // COORDINATOR POLLING: VM polls coordinator for step-by-step Claude CLI guidance
+  // MINIMAL CLOUD-CONFIG + ANSIBLE: Use working SSH approach
   private generateVMSetupScript(owner: string, repo: string, playbookPath: string, issue: any): string {
-    // COORDINATOR ARCHITECTURE: Use coordinator polling instead of mega-prompt Ansible approach
-    // FIXED: Remove template variables that could break YAML with quotes
-    const vmId = `vm-${Date.now()}-${repo.toLowerCase()}`;
-    const issueContext = `Issue #${issue.number}: ${issue.title?.replace(/['"]/g, '') || 'GitHub Issue'}`;
-    const anthropicApiKey = process.env.ANTHROPIC_API_KEY || '';
-    const githubToken = process.env.GITHUB_TOKEN || '';
+    // CRITICAL: Use SSH-SAFE minimal cloud-config ONLY
+    // NEVER add complex write_files or automation scripts here - they BREAK SSH
+    // ALL complex automation belongs in Ansible, not cloud-config
     
     return `#cloud-config
 users:
@@ -889,122 +938,13 @@ packages:
   - curl
   - wget
   - git
-  - jq
-  - nodejs
-  - npm
+  - python3
+  - python3-pip
+  - ansible
 
 runcmd:
   - echo "Billy VM created at $(date)" > /home/ubuntu/billy-status.log
-  - echo "SSH access ready" >> /home/ubuntu/billy-status.log
-  - echo "Installing Node.js and tools..." >> /home/ubuntu/billy-status.log
-  - curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-  - sudo apt-get install -y nodejs
-  - echo "Setting up coordinator workflow..." >> /home/ubuntu/billy-status.log
-  - chown ubuntu:ubuntu /home/ubuntu/coordinator-workflow.sh
-  - chmod +x /home/ubuntu/coordinator-workflow.sh
-  - echo "Starting coordinator workflow..." >> /home/ubuntu/billy-status.log
-  - sudo -u ubuntu nohup /home/ubuntu/coordinator-workflow.sh > /home/ubuntu/coordinator.log 2>&1 &
-  - echo "Coordinator workflow started" >> /home/ubuntu/billy-status.log
-
-write_files:
-  - path: /home/ubuntu/coordinator-workflow.sh
-    permissions: '0755'
-    content: |
-      #!/bin/bash
-      # Billy's Coordinator Workflow - Polls coordinator for step-by-step guidance
-      
-      VM_ID="${vmId}"
-      COORDINATOR_URL="https://agent-billy-production.up.railway.app/coordinator/next-step"
-      ISSUE_CONTEXT="${issueContext}"
-      ANTHROPIC_API_KEY="${anthropicApiKey}"
-      GITHUB_TOKEN="${githubToken}"
-      
-      echo "🤖 Billy Coordinator Workflow Started at $(date)" > /home/ubuntu/coordinator.log
-      echo "VM ID: $VM_ID" >> /home/ubuntu/coordinator.log
-      echo "Issue: $ISSUE_CONTEXT" >> /home/ubuntu/coordinator.log
-      echo "Coordinator: $COORDINATOR_URL" >> /home/ubuntu/coordinator.log
-      
-      # Install Claude CLI
-      echo "📦 Installing Claude CLI..." >> /home/ubuntu/coordinator.log
-      npm install -g @anthropic-ai/claude-code
-      
-      # Install GitHub CLI for PR creation
-      echo "📦 Installing GitHub CLI..." >> /home/ubuntu/coordinator.log
-      curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-      echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-      sudo apt update && sudo apt install -y gh
-      echo "$GITHUB_TOKEN" | gh auth login --with-token
-      
-      # Clone repository
-      echo "📁 Cloning repository..." >> /home/ubuntu/coordinator.log
-      git clone https://github.com/${owner}/${repo}.git
-      cd ${repo}
-      
-      # Set up git identity
-      git config user.name "Agent Billy"
-      git config user.email "agent-billy@givegrove.com"
-      
-      # Install dependencies for simple projects (skip complex setup for now)
-      echo "📦 Installing dependencies..." >> /home/ubuntu/coordinator.log
-      if [ -f package.json ]; then
-        npm install
-      fi
-      
-      # MAIN COORDINATOR POLLING LOOP
-      echo "🔄 Starting coordinator polling loop..." >> /home/ubuntu/coordinator.log
-      current_step="initial"
-      recent_output="Claude CLI initialized and ready for commands"
-      max_iterations=20
-      iteration=0
-      
-      while [ $iteration -lt $max_iterations ]; do
-        iteration=$((iteration + 1))
-        echo "🔄 Coordinator Loop Iteration $iteration" >> /home/ubuntu/coordinator.log
-        
-        # 1. CALL COORDINATOR FOR NEXT STEP (using jq for safe JSON generation)
-        coordinator_response=$(jq -n \\
-          --arg vm_id "$VM_ID" \\
-          --arg issue_context "$ISSUE_CONTEXT" \\
-          --arg recent_output "$recent_output" \\
-          --arg current_step "$current_step" \\
-          '{vm_id: $vm_id, issue_context: $issue_context, recent_output: $recent_output, current_step: $current_step}' | \\
-          curl -s -X POST "$COORDINATOR_URL" \\
-            -H "Content-Type: application/json" \\
-            -d @-)
-        
-        echo "📡 Coordinator response: $coordinator_response" >> /home/ubuntu/coordinator.log
-        
-        # 2. EXTRACT NEXT PROMPT AND COMPLETION STATUS
-        next_prompt=$(echo "$coordinator_response" | jq -r '.next_prompt')
-        is_complete=$(echo "$coordinator_response" | jq -r '.complete')
-        
-        # 3. CHECK IF WORKFLOW IS COMPLETE
-        if [ "$is_complete" = "true" ]; then
-          echo "🎉 Workflow completed! Coordinator returned: complete=true" >> /home/ubuntu/coordinator.log
-          break
-        fi
-        
-        # 4. FEED PROMPT TO CLAUDE CLI
-        echo "🤖 Sending prompt to Claude CLI: $next_prompt" >> /home/ubuntu/coordinator.log
-        export ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY"
-        recent_output=$(echo "$next_prompt" | claude --print --dangerously-skip-permissions 2>&1)
-        
-        echo "🔄 Claude CLI output: $recent_output" >> /home/ubuntu/coordinator.log
-        
-        # 5. UPDATE CURRENT STEP BASED ON OUTPUT
-        if [[ "$recent_output" == *"updated"* ]] || [[ "$recent_output" == *"implemented"* ]]; then
-          current_step="coding_complete"
-        elif [[ "$recent_output" == *"test"* ]] && [[ "$recent_output" == *"passed"* ]]; then
-          current_step="testing_complete"
-        elif [[ "$recent_output" == *"pull request"* ]] || [[ "$recent_output" == *"PR"* ]]; then
-          current_step="pr_complete"
-        fi
-        
-        # 6. BRIEF PAUSE BEFORE NEXT ITERATION
-        sleep 30
-      done
-      
-      echo "🧹 Workflow complete. VM will self-destruct..." >> /home/ubuntu/coordinator.log`;
+  - echo "SSH access ready - Ansible will handle the rest" >> /home/ubuntu/billy-status.log`;
   }
 
   // Execute simple comment workflow

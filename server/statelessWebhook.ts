@@ -1382,6 +1382,7 @@ Provide the exact prompt for Claude CLI based on what needs to happen next.
       console.log(`🚀 Agent Billy stateless webhook server running on port ${port}`);
       console.log(`📊 Health check: http://localhost:${port}/health`);
       console.log(`🎣 Webhook endpoint: http://localhost:${port}/webhooks/github`);
+      console.log(`🤖 Coordinator endpoint: http://localhost:${port}/coordinator/next-step`);
       console.log(`🧠 Mode: Stateless (no memory required)`);
       console.log(`🚫 Memory: Not needed - all state from GitHub`);
     });

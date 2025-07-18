@@ -975,15 +975,16 @@ write_files:
         iteration=$((iteration + 1))
         echo "🔄 Coordinator Loop Iteration $iteration" >> /home/ubuntu/coordinator.log
         
-        # 1. CALL COORDINATOR FOR NEXT STEP
-        coordinator_response=$(curl -s -X POST "$COORDINATOR_URL" \\
-          -H "Content-Type: application/json" \\
-          -d "{
-            \\"vm_id\\": \\"$VM_ID\\",
-            \\"issue_context\\": \\"$ISSUE_CONTEXT\\",
-            \\"recent_output\\": \\"$recent_output\\",
-            \\"current_step\\": \\"$current_step\\"
-          }")
+        # 1. CALL COORDINATOR FOR NEXT STEP (using jq for safe JSON generation)
+        coordinator_response=$(jq -n \\
+          --arg vm_id "$VM_ID" \\
+          --arg issue_context "$ISSUE_CONTEXT" \\
+          --arg recent_output "$recent_output" \\
+          --arg current_step "$current_step" \\
+          '{vm_id: $vm_id, issue_context: $issue_context, recent_output: $recent_output, current_step: $current_step}' | \\
+          curl -s -X POST "$COORDINATOR_URL" \\
+            -H "Content-Type: application/json" \\
+            -d @-)
         
         echo "📡 Coordinator response: $coordinator_response" >> /home/ubuntu/coordinator.log
         

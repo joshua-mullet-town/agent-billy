@@ -53,11 +53,11 @@ This tracks the big milestones from current webhook server to fully functional i
 
 ## 🔄 In Progress
 
-### Phase 3C: BUSINESS WORKFLOW AUTOMATION - **IMPLEMENTATION ADDED, TESTING REQUIRED**
+### Phase 3C: BUSINESS WORKFLOW AUTOMATION - **ARCHITECTURE PIVOT TO COORDINATOR**
 
-## 🎯 **CURRENT STATUS: AUTONOMOUS IMPLEMENTATION CODED BUT UNTESTED**
+## 🏗️ **CURRENT STATUS: COORDINATOR ARCHITECTURE IMPLEMENTATION**
 
-**WHAT WE'VE DONE**: Added autonomous implementation section to Billy's cloud-init script, but haven't tested it end-to-end yet.
+**WHAT WE'VE DONE**: Discovered mega-prompt approach is brittle. Moving to coordinator architecture for step-by-step Claude CLI guidance.
 
 **🔄 BUSINESS WORKFLOW AUTOMATION (Implementation Complete, Testing Required):**
 - [x] **🤖 Autonomous Issue Reading** - ✅ CODED: Billy now reads GitHub issue context in VM
@@ -67,18 +67,22 @@ This tracks the big milestones from current webhook server to fully functional i
 - [x] **🤖 GitHub CLI Installation** - ✅ CODED: Added to Ansible playbook with authentication
 - [ ] **🤖 Autonomous VM Cleanup** - ❌ STILL TODO: Billy needs to destroy VM after completion
 
-**❌ CRITICAL TESTING STILL REQUIRED**: 
-- [ ] **End-to-End Test**: Trigger fresh Billy automation to test complete workflow
-- [ ] **Verify Claude CLI Gets Issue Context**: Check if issue details are properly passed
-- [ ] **Verify README.md Changes**: Check if Claude CLI actually makes the changes
-- [ ] **Verify Playwright Tests**: Check if Playwright MCP actually runs tests
-- [ ] **Verify PR Creation**: Check if GitHub CLI creates pull request successfully
-- [ ] **Fix Any Bugs Found**: Debug and fix issues discovered during testing
+**🎯 COORDINATOR ARCHITECTURE IMPLEMENTATION:**
+- [ ] **Design Coordinator Endpoint**: Create new endpoint to guide Claude CLI step-by-step
+- [ ] **Implement VM-Initiated Polling**: VM sends Claude CLI output to coordinator
+- [ ] **Create Step-by-Step Workflow**: Code change → test → PR creation with coordinator guidance
+- [ ] **Test Coordinator with Claude CLI**: Verify coordinator can guide Claude CLI through workflow
+- [ ] **Deploy Coordinator to Railway**: Add coordinator endpoint to existing Billy service
+
+**❌ DEFERRED TESTING (Will Be Easier with Coordinator):**
+- [ ] **Verify Playwright MCP Actually Works**: ❌ DEFERRED - Easier to debug with coordinator
+- [ ] **Verify PR Creation**: Will test with coordinator architecture
+- [ ] **End-to-End Test**: Will test complete coordinator workflow
 
 **NEXT ACTIONS**: 
-1. Test complete automation end-to-end
-2. Debug any issues found
-3. Iterate until fully working
+1. Implement coordinator endpoint
+2. Test coordinator with Claude CLI step-by-step
+3. Deploy and test complete coordinator workflow
 
 ## 🚨 **TESTING STANDARDS - NO SHORTCUTS ALLOWED**
 

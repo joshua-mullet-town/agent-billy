@@ -1002,10 +1002,20 @@ Monitor Billy's VM automation progress:
 - ✅ Repository cloning: GiveGrove cloned with 1317+ packages installed
 - ✅ GUI environment: X11, VNC, Firefox working
 
-**❌ BUSINESS WORKFLOW VALIDATION NEEDED:**
-- ❌ **ROOT CAUSE IDENTIFIED**: Billy stops after Ansible - no autonomous implementation step
-- ❌ **SOLUTION REQUIRED**: Add autonomous implementation section to Billy's cloud-init script
-- ❌ **MISSING COMPONENTS**: Issue reading, Claude CLI automation, Playwright testing, PR creation
+**🏗️ ARCHITECTURE PIVOT: COORDINATOR APPROACH**
+- ✅ **INFRASTRUCTURE COMPLETE**: Billy creates VMs, installs Claude CLI, sets up environment
+- ✅ **CLAUDE CLI AUTOMATION**: Proven working with --dangerously-skip-permissions
+- ❌ **CURRENT ARCHITECTURE FLAW**: One mega-prompt approach is brittle and hard to debug
+- ✅ **NEW SOLUTION**: Coordinator architecture for step-by-step Claude CLI guidance
+
+**🎯 COORDINATOR ARCHITECTURE APPROACH:**
+- **Step 1**: VM runs Claude CLI for code changes
+- **Step 2**: VM sends output to coordinator endpoint
+- **Step 3**: Coordinator analyzes output + issue context → determines next prompt
+- **Step 4**: VM feeds coordinator's prompt back to Claude CLI
+- **Step 5**: Repeat until workflow complete (code change → test → PR)
+
+**BENEFITS**: More resilient, debuggable, human-like workflow guidance
 
 ## Context Preservation
 

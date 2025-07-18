@@ -1112,6 +1112,87 @@ I'm ready to execute your custom implementation workflow.
     );
   }
 
+  // Coordinator endpoint for step-by-step Claude CLI guidance
+  public async coordinatorNextStep(req: any, res: any): Promise<void> {
+    const { vm_id, issue_context, recent_output, current_step } = req.body;
+    
+    console.log(`🔧 Coordinator analyzing step for VM ${vm_id}`);
+    console.log(`📋 Current step: ${current_step}`);
+    console.log(`📝 Recent output: ${recent_output?.substring(0, 200)}...`);
+
+    // Determine next step based on three-phase workflow
+    const coordinatorPrompt = `
+GITHUB ISSUE CONTEXT:
+${issue_context}
+
+RECENT CLAUDE CLI OUTPUT:
+${recent_output}
+
+CURRENT WORKFLOW STEP: ${current_step}
+
+BILLY'S THREE-PHASE WORKFLOW:
+1. CODING PHASE: Read the GitHub issue and implement the required changes
+2. TESTING PHASE: Test the changes using Playwright MCP or appropriate testing methods
+3. PR PHASE: Create pull request with the changes
+
+COORDINATOR INSTRUCTIONS:
+Analyze the recent CLI output and determine which phase we're in:
+
+- If we just started OR no code changes made yet → CODING PHASE
+- If code changes were made but not tested → TESTING PHASE  
+- If changes were tested successfully → PR PHASE
+- If PR was created → WORKFLOW_COMPLETE
+
+Based on the phase, provide the exact prompt for Claude CLI:
+
+CODING PHASE: Tell Claude CLI to read the issue and make the required changes
+TESTING PHASE: Tell Claude CLI to test the changes with Playwright MCP
+PR PHASE: Tell Claude CLI to create a pull request with the changes
+
+Respond with just the next prompt for Claude CLI, or "WORKFLOW_COMPLETE" if done.
+`;
+
+    try {
+      const response = await callLLM({
+        model: 'claude-3-haiku-20240307',
+        messages: [{ role: 'user', content: coordinatorPrompt }],
+        max_tokens: 1000
+      });
+      
+      const nextPrompt = response.content.trim();
+      const isComplete = nextPrompt.includes('WORKFLOW_COMPLETE');
+      
+      console.log(`✅ Coordinator determined next step: ${nextPrompt.substring(0, 100)}...`);
+      
+      res.statusCode = 200;
+      res.end(JSON.stringify({ 
+        next_prompt: nextPrompt,
+        complete: isComplete,
+        phase: this.determinePhase(recent_output),
+        timestamp: new Date().toISOString()
+      }));
+    } catch (error) {
+      console.error('❌ Coordinator error:', error);
+      res.statusCode = 500;
+      res.end(JSON.stringify({ 
+        error: 'Coordinator analysis failed',
+        timestamp: new Date().toISOString()
+      }));
+    }
+  }
+
+  // Helper method to determine current phase from CLI output
+  private determinePhase(output: string): string {
+    if (!output || output.trim().length === 0) return 'coding';
+    
+    // Check for indicators of completed phases
+    if (output.includes('pull request') || output.includes('PR created')) return 'complete';
+    if (output.includes('test') && (output.includes('passed') || output.includes('successful'))) return 'pr';
+    if (output.includes('file') && (output.includes('created') || output.includes('modified'))) return 'testing';
+    
+    return 'coding';
+  }
+
   // Check if clarification is needed
   private async checkIfClarificationNeeded(issue: any, repository: any): Promise<{ needsClarification: boolean; questions?: string }> {
     try {
@@ -1230,7 +1311,8 @@ I'm ready to execute your custom implementation workflow.
             message: 'Agent Billy Stateless Webhook Server',
             endpoints: {
               health: '/health',
-              webhook: '/webhooks/github'
+              webhook: '/webhooks/github',
+              coordinator: '/coordinator/next-step'
             },
             timestamp: new Date().toISOString()
           }, null, 2));
@@ -1270,6 +1352,28 @@ I'm ready to execute your custom implementation workflow.
               res.statusCode = 500;
               res.end(JSON.stringify({ 
                 error: 'Internal server error',
+                timestamp: new Date().toISOString()
+              }));
+            }
+          });
+
+        } else if (req.method === 'POST' && req.url === '/coordinator/next-step') {
+          let body = '';
+          
+          req.on('data', chunk => {
+            body += chunk.toString();
+          });
+
+          req.on('end', async () => {
+            try {
+              const requestBody = JSON.parse(body);
+              await this.coordinatorNextStep({ body: requestBody }, res);
+
+            } catch (error) {
+              console.error('❌ Coordinator error:', error);
+              res.statusCode = 500;
+              res.end(JSON.stringify({ 
+                error: 'Coordinator processing failed',
                 timestamp: new Date().toISOString()
               }));
             }

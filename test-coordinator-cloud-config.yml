@@ -1,0 +1,142 @@
+#cloud-config
+users:
+  - name: ubuntu
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICOWn4+jHkJv1qZnX++HA26lDCeKzHAP1UFJkMIxjHAl joshuamullet@Joshuas-MacBook-Air.local
+    sudo: ALL=(ALL) NOPASSWD:ALL
+
+packages:
+  - curl
+  - wget
+  - git
+  - snapd
+
+write_files:
+  - path: /home/ubuntu/coordinator-workflow.sh
+    content: |
+      #!/bin/bash
+      # Agent Billy Coordinator Workflow Script
+      # Tests step-by-step Claude CLI coordination
+      
+      VM_ID="test-vm-local"
+      COORDINATOR_URL="https://agent-billy-production.up.railway.app/coordinator/next-step"
+      ISSUE_CONTEXT="Issue #1119: Update README.md to include setup instructions for local development"
+      
+      # Function to call coordinator and get next prompt
+      get_next_prompt() {
+        local recent_output="$1"
+        local current_step="$2"
+        
+        echo "🤖 Calling coordinator for next step..."
+        
+        curl -s -X POST "$COORDINATOR_URL" \
+          -H "Content-Type: application/json" \
+          -d "{
+            \"vm_id\": \"$VM_ID\",
+            \"issue_context\": \"$ISSUE_CONTEXT\",
+            \"recent_output\": \"$recent_output\",
+            \"current_step\": \"$current_step\"
+          }" > /tmp/coordinator_response.json
+          
+        if [ $? -eq 0 ]; then
+          cat /tmp/coordinator_response.json | jq -r '.next_prompt' 2>/dev/null || echo "Error parsing coordinator response"
+        else
+          echo "Error calling coordinator endpoint"
+        fi
+      }
+      
+      # Function to simulate Claude CLI interaction
+      simulate_claude_cli() {
+        local prompt="$1"
+        echo "💬 Claude CLI Prompt: $prompt"
+        
+        # Simulate different responses based on prompt content
+        if [[ "$prompt" == *"implement"* ]] || [[ "$prompt" == *"code"* ]]; then
+          echo "📝 Successfully updated README.md with setup instructions"
+          echo "✅ Changes written to file"
+          return 0
+        elif [[ "$prompt" == *"test"* ]] || [[ "$prompt" == *"playwright"* ]]; then
+          echo "🧪 Running Playwright tests..."
+          echo "✅ All tests passed successfully"
+          return 0
+        elif [[ "$prompt" == *"pull request"* ]] || [[ "$prompt" == *"PR"* ]]; then
+          echo "🔀 Creating pull request..."
+          echo "✅ Pull request #42 created successfully"
+          return 0
+        else
+          echo "ℹ️  Processing request: $prompt"
+          return 0
+        fi
+      }
+      
+      # Main workflow loop
+      echo "🚀 Starting Billy Coordinator Workflow Test"
+      echo "VM ID: $VM_ID"
+      echo "Issue: $ISSUE_CONTEXT"
+      echo ""
+      
+      step_count=0
+      max_steps=5
+      current_step="initial"
+      recent_output="Starting Claude CLI session... Ready for input"
+      
+      while [ $step_count -lt $max_steps ]; do
+        step_count=$((step_count + 1))
+        echo "🔄 Step $step_count: Getting next prompt from coordinator..."
+        
+        # Get next prompt from coordinator
+        next_prompt=$(get_next_prompt "$recent_output" "$current_step")
+        echo "Coordinator response: $next_prompt"
+        
+        # Check if workflow is complete
+        if [[ "$next_prompt" == *"WORKFLOW_COMPLETE"* ]]; then
+          echo "🎉 Workflow completed successfully!"
+          break
+        fi
+        
+        # Check for coordinator errors
+        if [[ "$next_prompt" == *"error"* ]] || [[ "$next_prompt" == *"Error"* ]]; then
+          echo "❌ Coordinator error: $next_prompt"
+          echo "Retrying in 10 seconds..."
+          sleep 10
+          continue
+        fi
+        
+        # Simulate Claude CLI execution
+        echo ""
+        echo "🤖 Executing Claude CLI with coordinator prompt..."
+        recent_output=$(simulate_claude_cli "$next_prompt")
+        echo "Output: $recent_output"
+        echo ""
+        
+        # Update current step based on output
+        if [[ "$recent_output" == *"updated README"* ]]; then
+          current_step="coding_complete"
+        elif [[ "$recent_output" == *"tests passed"* ]]; then
+          current_step="testing_complete"
+        elif [[ "$recent_output" == *"pull request"* ]]; then
+          current_step="pr_complete"
+        fi
+        
+        # Brief pause between steps
+        sleep 5
+      done
+      
+      echo ""
+      echo "📊 Workflow Summary:"
+      echo "- Steps completed: $step_count"
+      echo "- Final step: $current_step"
+      echo "- Final output: $recent_output"
+    permissions: '0755'
+
+runcmd:
+  - echo "Billy Coordinator Test VM created at $(date)" > /home/ubuntu/billy-status.log
+  - echo "Installing Node.js and jq for coordinator testing..." >> /home/ubuntu/billy-status.log
+  - curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+  - sudo apt-get install -y nodejs jq
+  - echo "Node.js and jq installation complete" >> /home/ubuntu/billy-status.log
+  - chown ubuntu:ubuntu /home/ubuntu/coordinator-workflow.sh
+  - chmod +x /home/ubuntu/coordinator-workflow.sh
+  - echo "Starting coordinator workflow test..." >> /home/ubuntu/billy-status.log
+  - sudo -u ubuntu /home/ubuntu/coordinator-workflow.sh > /home/ubuntu/coordinator-test.log 2>&1 &
+  - echo "Coordinator test started" >> /home/ubuntu/billy-status.log

@@ -883,11 +883,13 @@ ansible_ssh_common_args='-o StrictHostKeyChecking=no'`;
     }
   }
 
-  // CLOUD-INIT SELF-CONFIGURATION: VM downloads files from GitHub and runs Ansible locally (Railway timeout immune)
+  // COORDINATOR POLLING: VM polls coordinator for step-by-step Claude CLI guidance
   private generateVMSetupScript(owner: string, repo: string, playbookPath: string, issue: any): string {
-    // FIXED: Remove owner specifications from write_files - ubuntu user doesn't exist during init-network stage
-    // FIXED: Use NodeSource APT instead of snap for Node.js installation
-    // DEPLOYMENT CHECK: 2025-07-17 12:05 - Force Railway cache refresh
+    // COORDINATOR ARCHITECTURE: Use coordinator polling instead of mega-prompt Ansible approach
+    // FIXED: Remove template variables that could break YAML with quotes
+    const vmId = `vm-${Date.now()}-${repo.toLowerCase()}`;
+    const issueContext = `Issue #${issue.number}: ${issue.title?.replace(/['"]/g, '') || 'GitHub Issue'}`;
+    
     return `#cloud-config
 users:
   - name: ubuntu
@@ -899,162 +901,121 @@ packages:
   - curl
   - wget
   - git
-  - snapd
+  - jq
+  - nodejs
+  - npm
 
 runcmd:
   - echo "Billy VM created at $(date)" > /home/ubuntu/billy-status.log
   - echo "SSH access ready" >> /home/ubuntu/billy-status.log
-  - echo "Installing Node.js 20..." >> /home/ubuntu/billy-status.log
+  - echo "Installing Node.js and tools..." >> /home/ubuntu/billy-status.log
   - curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
   - sudo apt-get install -y nodejs
-  - echo "Node.js installation complete" >> /home/ubuntu/billy-status.log
-  - echo "Setting up automation files..." >> /home/ubuntu/billy-status.log
-  - chown ubuntu:ubuntu /home/ubuntu/start-automation.sh /home/ubuntu/.vault_pass
-  - chmod +x /home/ubuntu/start-automation.sh
-  - chmod 600 /home/ubuntu/.vault_pass
-  - echo "Starting automation via cloud-init (Railway SSH bypass)..." >> /home/ubuntu/billy-status.log
-  - nohup /home/ubuntu/start-automation.sh > /home/ubuntu/automation.log 2>&1 &
-  - echo "Automation started independently" >> /home/ubuntu/billy-status.log
+  - echo "Setting up coordinator workflow..." >> /home/ubuntu/billy-status.log
+  - chown ubuntu:ubuntu /home/ubuntu/coordinator-workflow.sh
+  - chmod +x /home/ubuntu/coordinator-workflow.sh
+  - echo "Starting coordinator workflow..." >> /home/ubuntu/billy-status.log
+  - sudo -u ubuntu nohup /home/ubuntu/coordinator-workflow.sh > /home/ubuntu/coordinator.log 2>&1 &
+  - echo "Coordinator workflow started" >> /home/ubuntu/billy-status.log
 
 write_files:
-  - path: /home/ubuntu/start-automation.sh
+  - path: /home/ubuntu/coordinator-workflow.sh
     permissions: '0755'
     content: |
       #!/bin/bash
-      set -e
-      echo "=== Billy Cloud-Init Automation Started at $(date) ===" >> /home/ubuntu/automation.log
+      # Billy's Coordinator Workflow - Polls coordinator for step-by-step guidance
       
-      # Download Ansible playbook and secrets
-      curl -s -L "https://raw.githubusercontent.com/joshua-mullet-town/agent-billy/main/test-complete-environment.yml" -o /home/ubuntu/playbook.yml
-      curl -s -L "https://raw.githubusercontent.com/joshua-mullet-town/agent-billy/main/secrets.yml" -o /home/ubuntu/secrets.yml
+      VM_ID="${vmId}"
+      COORDINATOR_URL="https://agent-billy-production.up.railway.app/coordinator/next-step"
+      ISSUE_CONTEXT="${issueContext}"
+      ANTHROPIC_API_KEY="${process.env.ANTHROPIC_API_KEY}"
+      GITHUB_TOKEN="${process.env.GITHUB_TOKEN}"
       
-      # Install Ansible
-      sudo apt update && sudo apt install -y python3-pip
-      sudo pip3 install ansible
-      ansible-galaxy collection install community.general --force
+      echo "🤖 Billy Coordinator Workflow Started at $(date)" > /home/ubuntu/coordinator.log
+      echo "VM ID: $VM_ID" >> /home/ubuntu/coordinator.log
+      echo "Issue: $ISSUE_CONTEXT" >> /home/ubuntu/coordinator.log
+      echo "Coordinator: $COORDINATOR_URL" >> /home/ubuntu/coordinator.log
       
-      # Run Ansible playbook
-      ansible-playbook -i localhost, -c local /home/ubuntu/playbook.yml --vault-password-file /home/ubuntu/.vault_pass
+      # Install Claude CLI
+      echo "📦 Installing Claude CLI..." >> /home/ubuntu/coordinator.log
+      npm install -g @anthropic-ai/claude-code
       
-      echo "=== Ansible completed at $(date) ===" >> /home/ubuntu/automation.log
+      # Install GitHub CLI for PR creation
+      echo "📦 Installing GitHub CLI..." >> /home/ubuntu/coordinator.log
+      curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+      sudo apt update && sudo apt install -y gh
+      echo "$GITHUB_TOKEN" | gh auth login --with-token
       
-      # AUTONOMOUS IMPLEMENTATION SECTION
-      echo "=== Starting Billy's Autonomous Implementation ===" >> /home/ubuntu/automation.log
+      # Clone repository
+      echo "📁 Cloning repository..." >> /home/ubuntu/coordinator.log
+      git clone https://github.com/${owner}/${repo}.git
+      cd ${repo}
       
-      # Wait for services to be ready
-      echo "Waiting for services to be ready..." >> /home/ubuntu/automation.log
-      sleep 30
-      
-      # Change to repository directory
-      cd /home/ubuntu/GiveGrove
-      
-      # Set up git identity for commits
+      # Set up git identity
       git config user.name "Agent Billy"
       git config user.email "agent-billy@givegrove.com"
       
-      # Create new branch for implementation
-      BRANCH_NAME="billy-implementation-$(date +%s)"
-      git checkout -b "$BRANCH_NAME"
-      
-      # Set environment variables for Claude CLI
-      echo "Setting up environment variables for Claude CLI..." >> /home/ubuntu/automation.log
-      export ANTHROPIC_API_KEY="$(grep vault_anthropic_api_key /home/ubuntu/secrets.yml | cut -d'"' -f2)"
-      export DISPLAY=:99
-      
-      # Verify API key is set
-      if [ -z "$ANTHROPIC_API_KEY" ]; then
-        echo "ERROR: ANTHROPIC_API_KEY not found in secrets.yml" >> /home/ubuntu/automation.log
-        exit 1
+      # Install dependencies for simple projects (skip complex setup for now)
+      echo "📦 Installing dependencies..." >> /home/ubuntu/coordinator.log
+      if [ -f package.json ]; then
+        npm install
       fi
       
-      echo "ANTHROPIC_API_KEY configured (length: \${#ANTHROPIC_API_KEY})" >> /home/ubuntu/automation.log
+      # MAIN COORDINATOR POLLING LOOP
+      echo "🔄 Starting coordinator polling loop..." >> /home/ubuntu/coordinator.log
+      current_step="initial"
+      recent_output="Claude CLI initialized and ready for commands"
+      max_iterations=20
+      iteration=0
       
-      # Create issue context file for Claude
-      cat > /home/ubuntu/issue-context.txt << 'ISSUE_EOF'
-GITHUB ISSUE CONTEXT:
-Repository: ${owner}/${repo}
-Issue Number: ${issue.number}
-Issue Title: ${issue.title}
-Issue Body: ${issue.body}
-
-TESTING INSTRUCTIONS:
-${issue.body}
-
-AUTONOMOUS IMPLEMENTATION INSTRUCTIONS:
-You are Agent Billy running autonomously in a VM environment. You must:
-1. Read the issue requirements carefully
-2. Make the required changes to the codebase
-3. Test the changes (use simple HTTP requests if Playwright MCP has issues)
-4. Commit and push changes to create a pull request
-
-Environment Details:
-- Repository: /home/ubuntu/GiveGrove
-- Frontend: http://localhost:3000 (verify with curl)
-- Backend: http://localhost:4000  
-- Branch: $BRANCH_NAME
-- Playwright MCP: Available but may have network/display issues
-- Display: :99 (GUI available)
-- Alternative testing: Use curl or simple HTTP requests
-
-IMPORTANT: If Playwright MCP fails, use curl to test the frontend instead.
-
-Execute the implementation now.
-ISSUE_EOF
-      
-      # Call Claude CLI with autonomous implementation instructions
-      echo "Calling Claude CLI for autonomous implementation..." >> /home/ubuntu/automation.log
-      echo "Using --dangerously-skip-permissions for full autonomy..." >> /home/ubuntu/automation.log
-      
-      # TESTED AND PROVEN: --dangerously-skip-permissions eliminates all prompts
-      # No --timeout flag exists, but we can use system timeout command
-      timeout 1800 bash -c 'echo "$(cat /home/ubuntu/issue-context.txt)" | claude --dangerously-skip-permissions' 2>&1 | tee -a /home/ubuntu/claude-implementation.log
-      
-      # Check if changes were made
-      if git diff --quiet; then
-        echo "No changes made by Claude CLI" >> /home/ubuntu/automation.log
-      else
-        echo "Changes detected, committing and creating PR..." >> /home/ubuntu/automation.log
+      while [ $iteration -lt $max_iterations ]; do
+        iteration=$((iteration + 1))
+        echo "🔄 Coordinator Loop Iteration $iteration" >> /home/ubuntu/coordinator.log
         
-        # Commit all changes
-        git add -A
-        git commit -m "Implement: ${issue.title}
-
-Autonomous implementation by Agent Billy
-- Issue: ${issue.title}
-- Repository: ${owner}/${repo}
-- Issue Number: ${issue.number}
-
-🤖 Generated with Agent Billy
-Co-Authored-By: Agent Billy <agent-billy@givegrove.com>"
+        # 1. CALL COORDINATOR FOR NEXT STEP
+        coordinator_response=$(curl -s -X POST "$COORDINATOR_URL" \\
+          -H "Content-Type: application/json" \\
+          -d "{
+            \\"vm_id\\": \\"$VM_ID\\",
+            \\"issue_context\\": \\"$ISSUE_CONTEXT\\",
+            \\"recent_output\\": \\"$recent_output\\",
+            \\"current_step\\": \\"$current_step\\"
+          }")
         
-        # Push branch to origin
-        git push -u origin "$BRANCH_NAME"
+        echo "📡 Coordinator response: $coordinator_response" >> /home/ubuntu/coordinator.log
         
-        # Create pull request using GitHub CLI (if available) or note for manual creation
-        if command -v gh &> /dev/null; then
-          echo "Creating pull request with GitHub CLI..." >> /home/ubuntu/automation.log
-          gh pr create --title "Implement: ${issue.title}" --body "Resolves #${issue.number}
-
-Autonomous implementation by Agent Billy.
-
-## Changes Made
-- ${issue.title}
-
-## Testing
-- Playwright MCP tests executed
-- Frontend/backend services verified
-
-🤖 Generated with Agent Billy" --base main --head "$BRANCH_NAME" 2>&1 | tee -a /home/ubuntu/pr-creation.log
-        else
-          echo "GitHub CLI not available, branch pushed for manual PR creation" >> /home/ubuntu/automation.log
+        # 2. EXTRACT NEXT PROMPT AND COMPLETION STATUS
+        next_prompt=$(echo "$coordinator_response" | jq -r '.next_prompt')
+        is_complete=$(echo "$coordinator_response" | jq -r '.complete')
+        
+        # 3. CHECK IF WORKFLOW IS COMPLETE
+        if [ "$is_complete" = "true" ]; then
+          echo "🎉 Workflow completed! Coordinator returned: complete=true" >> /home/ubuntu/coordinator.log
+          break
         fi
-      fi
+        
+        # 4. FEED PROMPT TO CLAUDE CLI
+        echo "🤖 Sending prompt to Claude CLI: $next_prompt" >> /home/ubuntu/coordinator.log
+        export ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY"
+        recent_output=$(echo "$next_prompt" | claude --print --dangerously-skip-permissions 2>&1)
+        
+        echo "🔄 Claude CLI output: $recent_output" >> /home/ubuntu/coordinator.log
+        
+        # 5. UPDATE CURRENT STEP BASED ON OUTPUT
+        if [[ "$recent_output" == *"updated"* ]] || [[ "$recent_output" == *"implemented"* ]]; then
+          current_step="coding_complete"
+        elif [[ "$recent_output" == *"test"* ]] && [[ "$recent_output" == *"passed"* ]]; then
+          current_step="testing_complete"
+        elif [[ "$recent_output" == *"pull request"* ]] || [[ "$recent_output" == *"PR"* ]]; then
+          current_step="pr_complete"
+        fi
+        
+        # 6. BRIEF PAUSE BEFORE NEXT ITERATION
+        sleep 30
+      done
       
-      echo "=== Billy's Autonomous Implementation Completed at $(date) ===" >> /home/ubuntu/automation.log
-
-  - path: /home/ubuntu/.vault_pass
-    permissions: '0600'
-    content: ansible-vault-password-2024`;
+      echo "🧹 Workflow complete. VM will self-destruct..." >> /home/ubuntu/coordinator.log`;
   }
 
   // Execute simple comment workflow

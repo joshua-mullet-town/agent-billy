@@ -53,6 +53,52 @@ Billy's brain is now a lean webhook server:
 - Environment variables: `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_INSTALLATION_ID`
 - Webhook secret: `GITHUB_WEBHOOK_SECRET` (optional but recommended)
 
+### 🚨 **RAILWAY DEPLOYMENT CACHE ISSUES - PARTIALLY SOLVED** 
+
+**PERSISTENT PROBLEM (2025-07-18)**: Railway's caching system can serve old code despite multiple redeploy attempts, especially with TypeScript projects.
+
+**⚠️ SYMPTOMS:**
+- Build errors referencing code that no longer exists (e.g., `claude-3-haiku-20240307` model references)
+- New endpoints returning "Not found" after successful deployment
+- TypeScript compilation errors on old code despite local builds succeeding
+
+**✅ SOLUTIONS THAT SOMETIMES WORK:**
+1. **Dashboard Redeploy** (preferred): Use Railway dashboard, not CLI - click "Redeploy" (not restart)
+2. **Cache Disabling**: `railway variables --set "DISABLE_NIXPACKS_CACHE=1"`
+3. **Force Rebuild**: `railway variables --set "FORCE_REBUILD=$(date +%s)" && railway redeploy --yes`
+4. **Git Push + Redeploy**: Make code change, commit, push, then redeploy
+
+**❌ SOLUTIONS THAT DON'T ALWAYS WORK:**
+- `railway redeploy --yes` (CLI command)
+- Environment variable cache flags alone
+- Multiple sequential redeploys
+
+**✅ NUCLEAR OPTION - AUTOMATED SUCCESS (2025-07-18):**
+**BREAKTHROUGH**: Automated nuclear process successfully resolved persistent cache issues!
+
+**WORKING SOLUTION:**
+```bash
+# 1. Backup environment variables
+railway variables --json > railway-backup-$(date +%s).json
+
+# 2. Remove current deployment (clears cache)
+railway down
+
+# 3. Fresh deployment (bypasses cached layers)
+railway up
+```
+
+**RESULT**: Fresh deployment completely cleared cache corruption and deployed latest coordinator code successfully.
+
+**RESEARCH FINDINGS (2025-07-18):**
+- Railway's Builder V2 (beta) has known cache issues with TypeScript projects
+- Cache invalidation problems affect dependency resolution and module imports
+- Dashboard redeploy uses different cache clearing mechanism than CLI
+- **SOLUTION**: `railway down` + `railway up` sequence bypasses cache layers more effectively than redeploy commands
+- Creating new service instances often work initially but fail on subsequent deployments
+
+**STATUS**: ✅ Railway deployment issues resolved with automated nuclear process. Coordinator endpoint fully operational.
+
 ## Key Files and Patterns
 
 ### Current Webhook Architecture

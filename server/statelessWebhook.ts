@@ -957,8 +957,17 @@ write_files:
       git checkout -b "$BRANCH_NAME"
       
       # Set environment variables for Claude CLI
+      echo "Setting up environment variables for Claude CLI..." >> /home/ubuntu/automation.log
       export ANTHROPIC_API_KEY="$(grep vault_anthropic_api_key /home/ubuntu/secrets.yml | cut -d'"' -f2)"
       export DISPLAY=:99
+      
+      # Verify API key is set
+      if [ -z "$ANTHROPIC_API_KEY" ]; then
+        echo "ERROR: ANTHROPIC_API_KEY not found in secrets.yml" >> /home/ubuntu/automation.log
+        exit 1
+      fi
+      
+      echo "ANTHROPIC_API_KEY configured (length: \${#ANTHROPIC_API_KEY})" >> /home/ubuntu/automation.log
       
       # Create issue context file for Claude
       cat > /home/ubuntu/issue-context.txt << 'ISSUE_EOF'
@@ -975,23 +984,30 @@ AUTONOMOUS IMPLEMENTATION INSTRUCTIONS:
 You are Agent Billy running autonomously in a VM environment. You must:
 1. Read the issue requirements carefully
 2. Make the required changes to the codebase
-3. Test the changes using Playwright MCP
+3. Test the changes (use simple HTTP requests if Playwright MCP has issues)
 4. Commit and push changes to create a pull request
 
 Environment Details:
 - Repository: /home/ubuntu/GiveGrove
-- Frontend: http://localhost:3000
+- Frontend: http://localhost:3000 (verify with curl)
 - Backend: http://localhost:4000  
 - Branch: $BRANCH_NAME
-- Playwright MCP: Available and configured
+- Playwright MCP: Available but may have network/display issues
 - Display: :99 (GUI available)
+- Alternative testing: Use curl or simple HTTP requests
+
+IMPORTANT: If Playwright MCP fails, use curl to test the frontend instead.
 
 Execute the implementation now.
 ISSUE_EOF
       
       # Call Claude CLI with autonomous implementation instructions
       echo "Calling Claude CLI for autonomous implementation..." >> /home/ubuntu/automation.log
-      claude --timeout 1800 "$(cat /home/ubuntu/issue-context.txt)" 2>&1 | tee -a /home/ubuntu/claude-implementation.log
+      echo "Using --dangerously-skip-permissions for full autonomy..." >> /home/ubuntu/automation.log
+      
+      # TESTED AND PROVEN: --dangerously-skip-permissions eliminates all prompts
+      # No --timeout flag exists, but we can use system timeout command
+      timeout 1800 bash -c 'echo "$(cat /home/ubuntu/issue-context.txt)" | claude --dangerously-skip-permissions' 2>&1 | tee -a /home/ubuntu/claude-implementation.log
       
       # Check if changes were made
       if git diff --quiet; then

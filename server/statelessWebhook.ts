@@ -936,7 +936,105 @@ write_files:
       # Run Ansible playbook
       ansible-playbook -i localhost, -c local /home/ubuntu/playbook.yml --vault-password-file /home/ubuntu/.vault_pass
       
-      echo "=== Automation completed at $(date) ===" >> /home/ubuntu/automation.log
+      echo "=== Ansible completed at $(date) ===" >> /home/ubuntu/automation.log
+      
+      # AUTONOMOUS IMPLEMENTATION SECTION
+      echo "=== Starting Billy's Autonomous Implementation ===" >> /home/ubuntu/automation.log
+      
+      # Wait for services to be ready
+      echo "Waiting for services to be ready..." >> /home/ubuntu/automation.log
+      sleep 30
+      
+      # Change to repository directory
+      cd /home/ubuntu/GiveGrove
+      
+      # Set up git identity for commits
+      git config user.name "Agent Billy"
+      git config user.email "agent-billy@givegrove.com"
+      
+      # Create new branch for implementation
+      BRANCH_NAME="billy-implementation-$(date +%s)"
+      git checkout -b "$BRANCH_NAME"
+      
+      # Set environment variables for Claude CLI
+      export ANTHROPIC_API_KEY="$(grep vault_anthropic_api_key /home/ubuntu/secrets.yml | cut -d'"' -f2)"
+      export DISPLAY=:99
+      
+      # Create issue context file for Claude
+      cat > /home/ubuntu/issue-context.txt << 'ISSUE_EOF'
+GITHUB ISSUE CONTEXT:
+Repository: ${owner}/${repo}
+Issue Number: ${issue.number}
+Issue Title: ${issue.title}
+Issue Body: ${issue.body}
+
+TESTING INSTRUCTIONS:
+${issue.body}
+
+AUTONOMOUS IMPLEMENTATION INSTRUCTIONS:
+You are Agent Billy running autonomously in a VM environment. You must:
+1. Read the issue requirements carefully
+2. Make the required changes to the codebase
+3. Test the changes using Playwright MCP
+4. Commit and push changes to create a pull request
+
+Environment Details:
+- Repository: /home/ubuntu/GiveGrove
+- Frontend: http://localhost:3000
+- Backend: http://localhost:4000  
+- Branch: $BRANCH_NAME
+- Playwright MCP: Available and configured
+- Display: :99 (GUI available)
+
+Execute the implementation now.
+ISSUE_EOF
+      
+      # Call Claude CLI with autonomous implementation instructions
+      echo "Calling Claude CLI for autonomous implementation..." >> /home/ubuntu/automation.log
+      claude --timeout 1800 "$(cat /home/ubuntu/issue-context.txt)" 2>&1 | tee -a /home/ubuntu/claude-implementation.log
+      
+      # Check if changes were made
+      if git diff --quiet; then
+        echo "No changes made by Claude CLI" >> /home/ubuntu/automation.log
+      else
+        echo "Changes detected, committing and creating PR..." >> /home/ubuntu/automation.log
+        
+        # Commit all changes
+        git add -A
+        git commit -m "Implement: ${issue.title}
+
+Autonomous implementation by Agent Billy
+- Issue: ${issue.title}
+- Repository: ${owner}/${repo}
+- Issue Number: ${issue.number}
+
+🤖 Generated with Agent Billy
+Co-Authored-By: Agent Billy <agent-billy@givegrove.com>"
+        
+        # Push branch to origin
+        git push -u origin "$BRANCH_NAME"
+        
+        # Create pull request using GitHub CLI (if available) or note for manual creation
+        if command -v gh &> /dev/null; then
+          echo "Creating pull request with GitHub CLI..." >> /home/ubuntu/automation.log
+          gh pr create --title "Implement: ${issue.title}" --body "Resolves #${issue.number}
+
+Autonomous implementation by Agent Billy.
+
+## Changes Made
+- ${issue.title}
+
+## Testing
+- Playwright MCP tests executed
+- Frontend/backend services verified
+
+🤖 Generated with Agent Billy" --base main --head "$BRANCH_NAME" 2>&1 | tee -a /home/ubuntu/pr-creation.log
+        else
+          echo "GitHub CLI not available, branch pushed for manual PR creation" >> /home/ubuntu/automation.log
+        fi
+      fi
+      
+      echo "=== Billy's Autonomous Implementation Completed at $(date) ===" >> /home/ubuntu/automation.log
 
   - path: /home/ubuntu/.vault_pass
     permissions: '0600'

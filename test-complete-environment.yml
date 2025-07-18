@@ -161,6 +161,22 @@
         state: present
       become: yes
 
+    - name: Install GitHub CLI (gh)
+      shell: |
+        curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+        sudo apt update
+        sudo apt install -y gh
+      become: yes
+
+    - name: Configure GitHub CLI authentication
+      shell: |
+        echo "{{ vault_github_token }}" | gh auth login --with-token
+        gh auth status
+      become_user: ubuntu
+      environment:
+        HOME: "/home/ubuntu"
+
     - name: Verify Claude Code CLI installation
       shell: which claude && claude --version
       register: claude_version

@@ -1120,7 +1120,7 @@ I'm ready to execute your custom implementation workflow.
     console.log(`📋 Current step: ${current_step}`);
     console.log(`📝 Recent output: ${recent_output?.substring(0, 200)}...`);
 
-    // Determine next step based on three-phase workflow
+    // Determine next step based on Claude CLI output
     const coordinatorPrompt = `
 GITHUB ISSUE CONTEXT:
 ${issue_context}
@@ -1128,28 +1128,21 @@ ${issue_context}
 RECENT CLAUDE CLI OUTPUT:
 ${recent_output}
 
-CURRENT WORKFLOW STEP: ${current_step}
-
-BILLY'S THREE-PHASE WORKFLOW:
-1. CODING PHASE: Read the GitHub issue and implement the required changes
-2. TESTING PHASE: Test the changes using Playwright MCP or appropriate testing methods
-3. PR PHASE: Create pull request with the changes
+BILLY'S WORKFLOW OPTIONS:
+You have three possible next steps:
+1. IMPLEMENT: Read the GitHub issue and make the required code changes
+2. TEST: Test the changes using Playwright MCP or appropriate testing methods  
+3. CREATE PR: Create a pull request with the changes
 
 COORDINATOR INSTRUCTIONS:
-Analyze the recent CLI output and determine which phase we're in:
+Look at the recent Claude CLI output and decide what should happen next:
 
-- If we just started OR no code changes made yet → CODING PHASE
-- If code changes were made but not tested → TESTING PHASE  
-- If changes were tested successfully → PR PHASE
-- If PR was created → WORKFLOW_COMPLETE
+- If no code changes have been made yet → Tell Claude CLI to implement the GitHub issue
+- If code changes were made but haven't been tested → Tell Claude CLI to test the changes
+- If changes were tested successfully → Tell Claude CLI to create a pull request
+- If a pull request was already created → Respond with "WORKFLOW_COMPLETE"
 
-Based on the phase, provide the exact prompt for Claude CLI:
-
-CODING PHASE: Tell Claude CLI to read the issue and make the required changes
-TESTING PHASE: Tell Claude CLI to test the changes with Playwright MCP
-PR PHASE: Tell Claude CLI to create a pull request with the changes
-
-Respond with just the next prompt for Claude CLI, or "WORKFLOW_COMPLETE" if done.
+Provide the exact prompt for Claude CLI based on what needs to happen next.
 `;
 
     try {
@@ -1168,7 +1161,6 @@ Respond with just the next prompt for Claude CLI, or "WORKFLOW_COMPLETE" if done
       res.end(JSON.stringify({ 
         next_prompt: nextPrompt,
         complete: isComplete,
-        phase: this.determinePhase(recent_output),
         timestamp: new Date().toISOString()
       }));
     } catch (error) {
@@ -1181,17 +1173,6 @@ Respond with just the next prompt for Claude CLI, or "WORKFLOW_COMPLETE" if done
     }
   }
 
-  // Helper method to determine current phase from CLI output
-  private determinePhase(output: string): string {
-    if (!output || output.trim().length === 0) return 'coding';
-    
-    // Check for indicators of completed phases
-    if (output.includes('pull request') || output.includes('PR created')) return 'complete';
-    if (output.includes('test') && (output.includes('passed') || output.includes('successful'))) return 'pr';
-    if (output.includes('file') && (output.includes('created') || output.includes('modified'))) return 'testing';
-    
-    return 'coding';
-  }
 
   // Check if clarification is needed
   private async checkIfClarificationNeeded(issue: any, repository: any): Promise<{ needsClarification: boolean; questions?: string }> {

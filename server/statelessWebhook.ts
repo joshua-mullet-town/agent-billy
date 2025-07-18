@@ -889,6 +889,8 @@ ansible_ssh_common_args='-o StrictHostKeyChecking=no'`;
     // FIXED: Remove template variables that could break YAML with quotes
     const vmId = `vm-${Date.now()}-${repo.toLowerCase()}`;
     const issueContext = `Issue #${issue.number}: ${issue.title?.replace(/['"]/g, '') || 'GitHub Issue'}`;
+    const anthropicApiKey = process.env.ANTHROPIC_API_KEY || '';
+    const githubToken = process.env.GITHUB_TOKEN || '';
     
     return `#cloud-config
 users:
@@ -928,8 +930,8 @@ write_files:
       VM_ID="${vmId}"
       COORDINATOR_URL="https://agent-billy-production.up.railway.app/coordinator/next-step"
       ISSUE_CONTEXT="${issueContext}"
-      ANTHROPIC_API_KEY="${process.env.ANTHROPIC_API_KEY}"
-      GITHUB_TOKEN="${process.env.GITHUB_TOKEN}"
+      ANTHROPIC_API_KEY="${anthropicApiKey}"
+      GITHUB_TOKEN="${githubToken}"
       
       echo "🤖 Billy Coordinator Workflow Started at $(date)" > /home/ubuntu/coordinator.log
       echo "VM ID: $VM_ID" >> /home/ubuntu/coordinator.log

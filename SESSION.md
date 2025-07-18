@@ -1017,6 +1017,31 @@ Monitor Billy's VM automation progress:
 
 **BENEFITS**: More resilient, debuggable, human-like workflow guidance
 
+## 🔧 **CURRENT WORK: COORDINATOR ENDPOINT IMPLEMENTATION (2025-07-18)**
+
+### ✅ **COMPLETED COORDINATOR DEVELOPMENT:**
+- **Endpoint Added**: `/coordinator/next-step` added to statelessWebhook.ts
+- **Three-Option Decision Making**: Implement, Test, or Create PR based on CLI output
+- **Simplified Logic**: Removed hard-coded phase detection for natural decision making
+- **GitHub Issue Integration**: Coordinator reads actual issue context, not hard-coded responses
+- **LLM Integration**: Uses claude-3-haiku for fast coordinator decision making
+
+### 🧪 **TESTING PHASE: COORDINATOR VALIDATION**
+**WHAT WE'RE TESTING**: Coordinator endpoint with sample CLI outputs to verify decision making
+
+**TEST SCENARIOS**:
+1. **Empty/Initial Output** → Should recommend implementing the GitHub issue
+2. **Code Changes Made** → Should recommend testing the changes
+3. **Tests Passed** → Should recommend creating PR
+4. **PR Created** → Should respond WORKFLOW_COMPLETE
+
+**TESTING APPROACH**: Local/Railway testing with curl commands before VM integration
+
+### ⏳ **NEXT STEPS AFTER COORDINATOR TESTING**:
+1. Update VM cloud-init script for step-by-step coordination
+2. Test complete coordinator workflow with Claude CLI
+3. Deploy and test end-to-end automation
+
 ## Context Preservation
 
 **🚨 RAILWAY SSH RESTRICTION - PERMANENT LESSON (2025-07-16) 🚨**

@@ -1147,9 +1147,9 @@ Provide the exact prompt for Claude CLI based on what needs to happen next.
 
     try {
       const response = await callLLM({
-        model: 'claude-3-haiku-20240307',
-        messages: [{ role: 'user', content: coordinatorPrompt }],
-        max_tokens: 1000
+        prompt: coordinatorPrompt,
+        model: 'claude',
+        options: { maxTokens: 1000 }
       });
       
       const nextPrompt = response.content.trim();

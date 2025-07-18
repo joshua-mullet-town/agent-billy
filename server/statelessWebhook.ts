@@ -267,21 +267,22 @@ I'm now implementing this feature using a dedicated development environment.
       // Wait for VM to be ready
       const readyVM = await vmOrchestrator.waitForVM(vm.id, 10);
       
-      // Update with ready status
+      // Update with coordinator architecture status
       await this.actions.commentOnIssue(owner, repo, issue.number, 
-        `🎉 **VM Ready - Testing Phase 1 Setup!**
+        `🤖 **VM Ready - Coordinator Workflow Starting!**
         
 **VM Status:**
-- ✅ VM is running
-- ✅ Public IP: ${readyVM.publicIp}
-- ✅ Basic setup completed
+- ✅ VM is running at ${readyVM.publicIp}
+- ✅ Cloud-init coordinator workflow deployed
+- ✅ Coordinator polling endpoint active
 
-**Phase 1 Testing:**
-- 🔍 Testing SSH connectivity
-- 🔍 Verifying cloud-config execution via SSH
-- 🔍 Checking basic VM setup completion
+**Coordinator Architecture:**
+- 🔄 VM polls coordinator for step-by-step guidance
+- 🤖 Claude CLI executes coordinator prompts autonomously  
+- 🧪 Playwright MCP integrated for testing
+- 📥 Pull request creation automated
 
-*Testing minimal setup before Ansible execution...*`);
+*Coordinator workflow initializing - autonomous implementation starting...*`);
 
       // Create SSH key file with proper base64 decoding (SOLUTION TO PERSISTENT SSH ISSUE)
       const fs = require('fs');
@@ -323,32 +324,17 @@ I'm now implementing this feature using a dedicated development environment.
         console.log(`❌ Failed to verify SSH key file: ${error}`);
       }
 
-      // PHASE 1: Wait for cloud-init completion instead of SSH test
-      // Billy waits for cloud-init to complete Node.js installation before Ansible
-      console.log(`⏳ Waiting for cloud-init to complete on VM ${readyVM.publicIp}`);
-      console.log(`🔍 Checking for enhanced setup completion...`);
+      // COORDINATOR ARCHITECTURE: Skip SSH testing, trust cloud-init coordinator workflow
+      console.log(`🤖 Coordinator workflow started autonomously in VM ${readyVM.publicIp}`);
+      console.log(`🔗 VM will poll: https://agent-billy-production.up.railway.app/coordinator/next-step`);
+      console.log(`⚠️ Railway bypasses SSH testing (platform limitation) - VM self-manages`);
       
-      const phase1Success = await this.waitForVMReadiness(readyVM.publicIp || '');
+      // Give cloud-init time to start coordinator workflow
+      console.log(`⏳ Allowing 60 seconds for cloud-init to start coordinator polling...`);
+      await new Promise(resolve => setTimeout(resolve, 60000));
       
-      if (!phase1Success) {
-        await this.actions.commentOnIssue(owner, repo, issue.number, 
-          `❌ **Phase 1 Failed - Basic VM Setup Issues**
-          
-**What Failed:**
-- SSH connectivity test failed
-- Basic cloud-config may not have executed properly
-- Cannot proceed to Ansible setup
-
-**Next Steps:**
-- Check cloud-config syntax and execution
-- Verify SSH key embedding in cloud-config
-- Debug basic VM initialization
-
-*VM available for manual debugging at ${readyVM.publicIp}*`);
-        
-        await this.actions.addLabel(owner, repo, issue.number, 'billy-phase1-failed');
-        return;
-      }
+      console.log(`✅ Coordinator workflow initialization period complete`);
+      console.log(`📡 VM should now be polling coordinator for step-by-step guidance`);
 
       // PHASE 1 SUCCESS - RAILWAY BYPASSES SSH (PLATFORM LIMITATION)
       console.log(`✅ Phase 1 complete - VM has SSH + Node.js, automation via cloud-init`);

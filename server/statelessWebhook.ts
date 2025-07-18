@@ -1148,7 +1148,6 @@ Provide the exact prompt for Claude CLI based on what needs to happen next.
     try {
       const response = await callLLM({
         prompt: coordinatorPrompt,
-        model: 'claude',
         options: { maxTokens: 1000 }
       });
       

@@ -119,8 +119,8 @@
       debug:
         msg: "npm version: {{ npm_version_check.stdout }}"
 
-    # 4. GUI ENVIRONMENT SETUP
-    - name: Install GUI packages
+    # 4. GUI ENVIRONMENT SETUP (ASYNC TO PREVENT TIMEOUT)
+    - name: Install GUI packages asynchronously
       apt:
         name:
           - xvfb
@@ -130,11 +130,14 @@
           - chromium-browser
           - xterm
         state: present
+      async: 3600  # 1 hour timeout for package installation
+      poll: 30     # Check every 30 seconds
+      register: gui_packages_result
 
     # 5. CLONE REPOSITORY WITH AUTHENTICATION
     - name: Clone GiveGrove repository
       git:
-        repo: "https://{{ vault_github_username }}:{{ vault_github_token }}@github.com/south-bend-code-works/GiveGrove.git"
+        repo: "https://{{ vault_github_token }}@github.com/south-bend-code-works/GiveGrove.git"
         dest: "{{ workspace_dir }}"
         force: yes
       become_user: ubuntu
@@ -201,7 +204,7 @@
         export ANTHROPIC_API_KEY="{{ vault_anthropic_api_key }}"
         export PATH="/usr/local/bin:$PATH"
         cd {{ workspace_dir }}
-        echo "2 + 2" | claude --timeout 30
+        timeout 30s bash -c "echo '2 + 2' | claude --print"
       become_user: ubuntu
       register: claude_auth_test
       changed_when: false
@@ -497,7 +500,88 @@
         tail -10 /tmp/backend.log 2>/dev/null || echo "No backend log"
       register: system_status
 
-    # 15. FINAL RESULTS
+    # 15. COORDINATOR POLLING SETUP
+    - name: Create coordinator polling script
+      copy:
+        content: |
+          #!/bin/bash
+          # Billy Coordinator Polling Script
+          COORDINATOR_URL="https://agent-billy-production.up.railway.app/coordinator/next-step"
+          LOG_FILE="/home/ubuntu/coordinator.log"
+          
+          echo "$(date): Coordinator polling started" >> $LOG_FILE
+          
+          while true; do
+            echo "$(date): Polling coordinator..." >> $LOG_FILE
+            
+            # Poll coordinator for next step
+            RESPONSE=$(curl -s -X POST "$COORDINATOR_URL" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "vm_ip": "'$(curl -s http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/address)'",
+                "status": "ready",
+                "phase": "implementation"
+              }' 2>>$LOG_FILE)
+            
+            if [ $? -eq 0 ] && [ ! -z "$RESPONSE" ]; then
+              echo "$(date): Coordinator response: $RESPONSE" >> $LOG_FILE
+              
+              # Parse response and execute if action provided
+              ACTION=$(echo "$RESPONSE" | jq -r '.action // empty' 2>/dev/null)
+              PROMPT=$(echo "$RESPONSE" | jq -r '.prompt // empty' 2>/dev/null)
+              
+              if [ "$ACTION" = "execute_claude" ] && [ ! -z "$PROMPT" ]; then
+                echo "$(date): Executing Claude CLI with prompt" >> $LOG_FILE
+                cd {{ workspace_dir }}
+                export ANTHROPIC_API_KEY="{{ vault_anthropic_api_key }}"
+                timeout 300s bash -c "echo \"$PROMPT\" | claude --print" >> $LOG_FILE 2>&1
+                echo "$(date): Claude CLI execution completed" >> $LOG_FILE
+              elif [ "$ACTION" = "complete" ]; then
+                echo "$(date): Coordinator workflow complete" >> $LOG_FILE
+                break
+              fi
+            else
+              echo "$(date): No coordinator response or error" >> $LOG_FILE
+            fi
+            
+            # Wait 30 seconds before next poll
+            sleep 30
+          done
+        dest: "/home/ubuntu/coordinator-polling.sh"
+        mode: '0755'
+        owner: ubuntu
+        group: ubuntu
+
+    - name: Start coordinator polling in background
+      shell: |
+        cd /home/ubuntu
+        nohup ./coordinator-polling.sh > /dev/null 2>&1 &
+        echo $! > coordinator-polling.pid
+        echo "Coordinator polling started with PID $(cat coordinator-polling.pid)"
+      become_user: ubuntu
+
+    - name: Verify coordinator polling is running
+      shell: |
+        sleep 5
+        if [ -f /home/ubuntu/coordinator-polling.pid ]; then
+          PID=$(cat /home/ubuntu/coordinator-polling.pid)
+          if ps -p $PID > /dev/null; then
+            echo "Coordinator polling is running (PID: $PID)"
+          else
+            echo "Coordinator polling failed to start"
+            exit 1
+          fi
+        else
+          echo "Coordinator polling PID file not found"
+          exit 1
+        fi
+      register: coordinator_status
+
+    - name: Display coordinator polling status
+      debug:
+        msg: "Coordinator polling status: {{ coordinator_status.stdout }}"
+
+    # 16. FINAL RESULTS
     - name: Display complete environment status
       debug:
         msg: |

@@ -63,6 +63,11 @@
           - python3
           - python3-pip
         state: present
+        lock_timeout: 300  # Wait up to 5 minutes for dpkg lock
+      register: apt_system_deps
+      until: apt_system_deps is not failed
+      retries: 10   # Try up to 10 times
+      delay: 30     # Wait 30 seconds between retries
 
     - name: Add NodeSource repository key
       apt_key:
@@ -84,6 +89,11 @@
           - libnode72
         state: absent
         purge: yes
+        lock_timeout: 300
+      register: apt_remove_nodejs
+      until: apt_remove_nodejs is not failed
+      retries: 10
+      delay: 30
       ignore_errors: yes
 
     - name: Clean up leftover Node.js packages
@@ -95,6 +105,11 @@
         name: nodejs
         state: present
         update_cache: yes
+        lock_timeout: 300
+      register: apt_install_nodejs
+      until: apt_install_nodejs is not failed
+      retries: 10
+      delay: 30
 
     - name: Verify Node.js version (must be 20.x)
       shell: node --version
@@ -130,9 +145,13 @@
           - chromium-browser
           - xterm
         state: present
+        lock_timeout: 300
+      register: apt_gui_packages
+      until: apt_gui_packages is not failed
+      retries: 10
+      delay: 30
       async: 3600  # 1 hour timeout for package installation
       poll: 30     # Check every 30 seconds
-      register: gui_packages_result
 
     # 5. CLONE REPOSITORY WITH AUTHENTICATION
     - name: Clone GiveGrove repository
@@ -183,6 +202,11 @@
       apt:
         name: gh
         state: present
+        lock_timeout: 300
+      register: apt_install_gh
+      until: apt_install_gh is not failed
+      retries: 10
+      delay: 30
       become: yes
 
     - name: Configure GitHub CLI authentication

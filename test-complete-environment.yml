@@ -164,12 +164,25 @@
         state: present
       become: yes
 
-    - name: Install GitHub CLI (gh)
-      shell: |
-        curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-        sudo apt update
-        sudo apt install -y gh
+    # GitHub CLI installation - FIXED: Individual tasks instead of failing multi-line shell
+    - name: Add GitHub CLI GPG key  
+      get_url:
+        url: https://cli.github.com/packages/githubcli-archive-keyring.gpg
+        dest: /usr/share/keyrings/githubcli-archive-keyring.gpg
+        mode: '0644'
+      become: yes
+        
+    - name: Add GitHub CLI repository
+      apt_repository:
+        repo: "deb [arch={{ ansible_architecture | replace('x86_64', 'amd64') }} signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main"
+        state: present
+        update_cache: yes
+      become: yes
+        
+    - name: Install GitHub CLI
+      apt:
+        name: gh
+        state: present
       become: yes
 
     - name: Configure GitHub CLI authentication

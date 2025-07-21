@@ -1,0 +1,142 @@
+---
+- name: Debug coordinator polling installation only
+  hosts: all
+  become: yes
+  vars:
+    workspace_dir: "/home/ubuntu/GiveGrove"
+    vault_anthropic_api_key: "{{ ansible_env.ANSIBLE_VAULT_ANTHROPIC_API_KEY | default('sk-placeholder') }}"
+
+  tasks:
+    - name: Kill any hanging Ansible processes first
+      shell: |
+        pkill -f ansible || true
+        pkill -f sleep || true
+        pkill -f AnsiballZ || true
+      ignore_errors: yes
+
+    - name: Check if coordinator files already exist
+      shell: find /home/ubuntu -name '*coordinator*' -o -name '*polling*' 2>/dev/null
+      register: existing_coordinator
+      ignore_errors: yes
+
+    - name: Display existing coordinator files
+      debug:
+        msg: "Existing coordinator files: {{ existing_coordinator.stdout_lines }}"
+
+    - name: Create coordinator polling script with enhanced logging
+      copy:
+        content: |
+          #!/bin/bash
+          # Billy Coordinator Polling Script - Enhanced Debug Version
+          COORDINATOR_URL="https://agent-billy-production.up.railway.app/coordinator/next-step"
+          LOG_FILE="/home/ubuntu/coordinator.log"
+          
+          echo "$(date): [DEBUG] Coordinator polling started - Enhanced debug version" >> $LOG_FILE
+          echo "$(date): [DEBUG] COORDINATOR_URL: $COORDINATOR_URL" >> $LOG_FILE
+          echo "$(date): [DEBUG] LOG_FILE: $LOG_FILE" >> $LOG_FILE
+          
+          # Test basic connectivity first
+          echo "$(date): [DEBUG] Testing basic connectivity..." >> $LOG_FILE
+          curl -s --connect-timeout 10 https://google.com > /dev/null
+          if [ $? -eq 0 ]; then
+            echo "$(date): [DEBUG] Internet connectivity: OK" >> $LOG_FILE
+          else
+            echo "$(date): [DEBUG] Internet connectivity: FAILED" >> $LOG_FILE
+          fi
+          
+          while true; do
+            echo "$(date): [DEBUG] Starting polling cycle..." >> $LOG_FILE
+            
+            # Poll coordinator for next step
+            echo "$(date): [DEBUG] Making request to: $COORDINATOR_URL" >> $LOG_FILE
+            RESPONSE=$(curl -s --connect-timeout 10 --max-time 30 -X POST "$COORDINATOR_URL" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "vm_ip": "'$(curl -s http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/address)'",
+                "status": "ready",
+                "environment": "development"
+              }' 2>> $LOG_FILE)
+            
+            CURL_EXIT_CODE=$?
+            echo "$(date): [DEBUG] Curl exit code: $CURL_EXIT_CODE" >> $LOG_FILE
+            echo "$(date): [DEBUG] Response: '$RESPONSE'" >> $LOG_FILE
+            
+            if [ $CURL_EXIT_CODE -eq 0 ] && [ ! -z "$RESPONSE" ]; then
+              # Parse response and execute if action provided
+              ACTION=$(echo "$RESPONSE" | jq -r '.action // empty' 2>/dev/null)
+              PROMPT=$(echo "$RESPONSE" | jq -r '.prompt // empty' 2>/dev/null)
+              
+              echo "$(date): [DEBUG] Parsed ACTION: '$ACTION'" >> $LOG_FILE
+              echo "$(date): [DEBUG] Parsed PROMPT: '$PROMPT'" >> $LOG_FILE
+              
+              if [ "$ACTION" = "execute_claude" ] && [ ! -z "$PROMPT" ]; then
+                echo "$(date): [DEBUG] Executing Claude CLI with prompt" >> $LOG_FILE
+                cd {{ workspace_dir }}
+                export ANTHROPIC_API_KEY="{{ vault_anthropic_api_key }}"
+                timeout 300s bash -c "echo \"$PROMPT\" | claude --print" >> $LOG_FILE 2>&1
+                CLAUDE_EXIT_CODE=$?
+                echo "$(date): [DEBUG] Claude CLI exit code: $CLAUDE_EXIT_CODE" >> $LOG_FILE
+              elif [ "$ACTION" = "complete" ]; then
+                echo "$(date): [DEBUG] Coordinator workflow complete" >> $LOG_FILE
+                break
+              else
+                echo "$(date): [DEBUG] No recognized action, continuing..." >> $LOG_FILE
+              fi
+            else
+              echo "$(date): [DEBUG] Request failed or empty response" >> $LOG_FILE
+            fi
+            
+            echo "$(date): [DEBUG] Waiting 30 seconds before next poll..." >> $LOG_FILE
+            sleep 30
+          done
+          
+          echo "$(date): [DEBUG] Coordinator polling ended" >> $LOG_FILE
+        dest: "/home/ubuntu/coordinator-polling.sh"
+        mode: '0755'
+        owner: ubuntu
+        group: ubuntu
+
+    - name: Test coordinator script creation
+      stat:
+        path: "/home/ubuntu/coordinator-polling.sh"
+      register: coordinator_script
+
+    - name: Display coordinator script status
+      debug:
+        msg: "Coordinator script created: {{ coordinator_script.stat.exists }}"
+
+    - name: Start coordinator polling in background
+      shell: |
+        cd /home/ubuntu
+        # Kill any existing coordinator processes
+        pkill -f coordinator-polling || true
+        # Start new process
+        nohup ./coordinator-polling.sh > /dev/null 2>&1 &
+        echo $! > coordinator-polling.pid
+        sleep 2
+        echo "Coordinator polling started with PID $(cat coordinator-polling.pid)"
+      become_user: ubuntu
+
+    - name: Verify coordinator polling is running
+      shell: |
+        sleep 5
+        if [ -f /home/ubuntu/coordinator-polling.pid ]; then
+          PID=$(cat /home/ubuntu/coordinator-polling.pid)
+          if ps -p $PID > /dev/null; then
+            echo "SUCCESS: Coordinator polling is running (PID: $PID)"
+            echo "Log file should be at: /home/ubuntu/coordinator.log"
+            # Show first few log lines
+            head -10 /home/ubuntu/coordinator.log 2>/dev/null || echo "No log yet"
+          else
+            echo "FAILED: Coordinator polling process not found"
+            exit 1
+          fi
+        else
+          echo "FAILED: Coordinator polling PID file not found"
+          exit 1
+        fi
+      register: coordinator_status
+
+    - name: Display coordinator polling status
+      debug:
+        msg: "{{ coordinator_status.stdout_lines }}"

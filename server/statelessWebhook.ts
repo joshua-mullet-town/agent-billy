@@ -437,55 +437,47 @@ ansible-playbook -i ${readyVM.publicIp}, test-complete-environment.yml --check
         return;
       }
 
-      // SUCCESSFUL ANSIBLE EXECUTION
+      // SUCCESSFUL HANDOFF TO VM
       await this.actions.commentOnIssue(owner, repo, issue.number, 
-        `🚀 **Ansible Automation Completed Successfully!**
+        `🚀 **VM Automation Handoff Successful!**
         
-**Railway Remote Execution Working:**
-- ✅ VM provisioned and SSH access confirmed
-- ✅ Ansible playbook executed successfully from Railway
-- ✅ Complete development environment setup completed
-- ✅ Repository cloning and Claude CLI fixes tested
+**✅ Billy Successfully Started:**
+- VM provisioned and SSH access confirmed
+- Ansible playbook files uploaded to VM
+- Automation script deployed and started on VM
+- VM is now running environment setup independently
 
-**What Was Installed:**
-- 📦 Node.js v20.x, Firebase CLI, Claude Code CLI
-- 🖥️ Desktop environment (VNC, Firefox, GUI packages)  
-- 📁 GiveGrove repository cloned with authentication
-- 🤖 Claude CLI configured with Playwright MCP integration
+**🔄 Current Status:**
+- **VM continues automation independently** (Railway handoff complete)
+- Ansible is installing: Node.js, Claude CLI, GiveGrove repo, services
+- Full environment setup takes 10-15 minutes to complete
+- Coordinator polling will start automatically when environment is ready
 
-**Environment Ready For:**
-- Implementation via Claude Code CLI
-- Browser testing via Playwright MCP
-- Pull request creation with completed work
+**⏱️ Billy's Role Complete:**
+Billy's job was to start the automation, not monitor completion.
+The VM at ${readyVM.publicIp} will continue working independently.
 
-**Access Information:**
-- **SSH**: \`ssh ubuntu@${readyVM.publicIp}\`
-- **VNC**: \`${readyVM.publicIp}:5900\` (for GUI access)
-- **Frontend**: \`http://${readyVM.publicIp}:3000\`
-- **Backend**: \`http://${readyVM.publicIp}:4000\`
-
-**Verification Commands:**
+**Manual Verification (Optional):**
 \`\`\`bash
-# Check installed software
+# Check current automation progress
+ssh ubuntu@${readyVM.publicIp} "tail -20 /home/ubuntu/automation.log"
+
+# Monitor Ansible execution
+ssh ubuntu@${readyVM.publicIp} "ps aux | grep ansible"
+
+# Verify when environment is ready
 ssh ubuntu@${readyVM.publicIp} "node --version && claude --version"
-
-# Verify services running
-ssh ubuntu@${readyVM.publicIp} "ps aux | grep -E '(vite|firebase|claude)'"
-
-# Check repository
-ssh ubuntu@${readyVM.publicIp} "ls -la /home/ubuntu/GiveGrove"
 \`\`\`
 
-**Next Steps:**
-- Complete development environment ready
-- All dependencies installed and configured
-- Ready for autonomous implementation workflow
-- Repository cloning and Claude CLI fixes now tested
+**Expected Timeline:**
+- **10-15 minutes**: Complete environment setup
+- **15+ minutes**: Coordinator polling begins implementation
+- **20+ minutes**: Pull request created (if successful)
 
 ---
-*Agent Billy Railway Remote Ansible Execution*`);
+*Agent Billy VM Handoff Complete - VM Operating Independently*`);
 
-      await this.actions.addLabel(owner, repo, issue.number, 'billy-ansible-complete');
+      await this.actions.addLabel(owner, repo, issue.number, 'billy-handoff-complete');
       await this.actions.removeLabel(owner, repo, issue.number, 'for-billy');
       
       console.log(`✅ VM workflow initiated for issue #${issue.number}, VM ID: ${vm.id}`);
@@ -1268,21 +1260,23 @@ ${issue_context}
 RECENT CLAUDE CLI OUTPUT:
 ${recent_output}
 
-BILLY'S WORKFLOW OPTIONS:
-You have three possible next steps:
+BILLY'S 3-PHASE WORKFLOW:
+You must execute these phases in order:
 1. IMPLEMENT: Read the GitHub issue and make the required code changes
-2. TEST: Test the changes using Playwright MCP or appropriate testing methods  
+2. TEST: Test the changes using Playwright MCP browser automation (click login button to verify functionality)
 3. CREATE PR: Create a pull request with the changes
 
 COORDINATOR INSTRUCTIONS:
 Look at the recent Claude CLI output and decide what should happen next:
 
-- If no code changes have been made yet → Tell Claude CLI to implement the GitHub issue
-- If code changes were made but haven't been tested → Tell Claude CLI to test the changes
-- If changes were tested successfully → Tell Claude CLI to create a pull request
-- If a pull request was already created → Respond with "WORKFLOW_COMPLETE"
+- If no code changes have been made yet → Return: "IMPLEMENT_GITHUB_ISSUE: Read the GitHub issue and make the required code changes."
+- If code changes were made but no browser testing occurred → Return: "TEST_WITH_PLAYWRIGHT_MCP: Use Playwright MCP to test the frontend by clicking the login button to verify the changes work in a real browser."
+- If Playwright testing was completed successfully (output contains browser testing results) → Return: "CREATE_PULL_REQUEST: Create a feature branch named 'agent-billy/feature/gh-{issue_number}', commit the changes, and create a pull request with the implemented changes and test results."
+- If a pull request was already created → Return: "WORKFLOW_COMPLETE"
 
-Provide the exact prompt for Claude CLI based on what needs to happen next.
+BRANCH NAMING CONVENTION: Use format 'agent-billy/feature/gh-{issue_number}' for feature branches.
+
+Provide the exact prompt for Claude CLI based on what needs to happen next. Be specific about using Playwright MCP for testing and proper branch naming for PRs.
 `;
 
     try {

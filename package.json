@@ -19,6 +19,7 @@
   "author": "Joshua Mullet",
   "license": "MIT",
   "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
     "@types/jsonwebtoken": "^9.0.0",
     "@types/node": "^20.0.0",
     "ts-node": "^10.9.0",
@@ -27,6 +28,7 @@
   "dependencies": {
     "axios": "^1.6.0",
     "dotenv": "^17.0.0",
+    "fs-extra": "^11.3.0",
     "js-yaml": "^4.1.0",
     "jsonwebtoken": "^9.0.0"
   }

@@ -165,3 +165,93 @@ This pattern should be used for ALL multiline secrets in environment variables.
 - **VM Accessibility**: Always works from local machine
 
 This proves the SSH key pair is valid and the VM setup is correct. The issue is purely in Railway's private key format handling.
+
+## 🚨 **NEW CRITICAL ISSUE (2025-07-18): SSH COMPLETELY BROKEN**
+
+### **REGRESSION**: SSH authentication failing on ALL new VMs despite identical working cloud-config
+
+**FAILED VMs (2025-07-18)**:
+- VM 508720494 at 165.227.218.89 - Permission denied
+- VM 508721318 at 167.71.165.98 - Permission denied  
+- VM 508723155 at 134.209.162.203 - Permission denied
+
+**EXACT CLOUD-CONFIG BEING SENT** (verified in Railway logs):
+```yaml
+#cloud-config
+users:
+  - name: ubuntu
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICOWn4+jHkJv1qZnX++HA26lDCeKzHAP1UFJkMIxjHAl joshuamullet@Joshuas-MacBook-Air.local
+    sudo: ALL=(ALL) NOPASSWD:ALL
+
+packages:
+  - curl
+  - wget
+  - git
+  - jq
+  - nodejs
+  - npm
+
+runcmd:
+  - echo "Billy VM created at $(date)" > /home/ubuntu/billy-status.log
+  - echo "SSH access ready" >> /home/ubuntu/billy-status.log
+  - echo "Installing Node.js and tools..." >> /home/ubuntu/billy-status.log
+  - curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+  - sudo apt-get install -y nodejs
+  - echo "Setting up coordinator workflow..." >> /home/ubuntu/billy-status.log
+  - chown ubuntu:ubuntu /home/ubuntu/coordinator-workflow.sh
+  - chmod +x /home/ubuntu/coordinator-workflow.sh
+  - echo "Starting coordinator workflow..." >> /home/ubuntu/billy-status.log
+  - sudo -u ubuntu nohup /home/ubuntu/coordinator-workflow.sh > /home/ubuntu/coordinator.log 2>&1 &
+  - echo "Coordinator workflow started" >> /home/ubuntu/billy-status.log
+```
+
+**SSH DEBUG OUTPUT**:
+```
+debug1: Offering public key: /Users/joshuamullet/.ssh/id_ed25519_digital_ocean ED25519 SHA256:iHFXF48mRl9mFwDd0DZ8WiJchaHkh86tYFL4+iHXk1w explicit
+debug1: Authentications that can continue: publickey,password
+Permission denied, please try again.
+```
+
+## ✅ **BREAKTHROUGH (2025-07-18): MINIMAL CONFIG WORKS!**
+
+**WORKING MINIMAL CLOUD-CONFIG** (VM 508725040 at 159.203.98.250):
+```yaml
+#cloud-config
+users:
+  - name: ubuntu
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICOWn4+jHkJv1qZnX++HA26lDCeKzHAP1UFJkMIxjHAl joshuamullet@Joshuas-MacBook-Air.local
+    sudo: ALL=(ALL) NOPASSWD:ALL
+```
+
+**SSH TEST RESULT**: ✅ SUCCESS
+```bash
+ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519_digital_ocean ubuntu@159.203.98.250 "whoami"
+# OUTPUT: ubuntu
+```
+
+**CONCLUSION**: Issue is NOT with DigitalOcean/Ubuntu - it's with Billy's complex cloud-config breaking SSH key installation.
+
+**SYSTEMATIC TESTING RESULTS**:
+
+**✅ STEP 1**: Minimal config works (VM 508725040 at 159.203.98.250)
+**✅ STEP 2**: Minimal + packages works (VM 508725948 at 138.197.35.22)
+**🔄 STEP 3**: Testing runcmd section next - this is likely the SSH breaker
+
+**🎉 REAL ISSUE IDENTIFIED (2025-07-18)**:
+
+**ROOT CAUSE**: Complex runcmd section causes cloud-init failures that break SSH
+**PROBLEM COMMANDS**: 
+- `curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -`
+- `sudo apt-get install -y nodejs`
+- `chown ubuntu:ubuntu /home/ubuntu/coordinator-workflow.sh`
+- `chmod +x /home/ubuntu/coordinator-workflow.sh`
+- `sudo -u ubuntu nohup /home/ubuntu/coordinator-workflow.sh > /home/ubuntu/coordinator.log 2>&1 &`
+
+**EVIDENCE**: 
+- ✅ Minimal runcmd works (VM 508727139 at 161.35.130.203 - SSH SUCCESS)
+- ❌ Complex runcmd fails (multiple VMs with SSH failures)
+
+**SOLUTION**: Simplify runcmd section, move complex setup to post-boot scripts
+**READY TO IMPLEMENT**: Fix Billy's generateVMSetupScript() method

@@ -63,7 +63,6 @@
           - python3
           - python3-pip
         state: present
-        lock_timeout: 300  # Wait up to 5 minutes for dpkg lock
       register: apt_system_deps
       until: apt_system_deps is not failed
       retries: 10   # Try up to 10 times
@@ -89,7 +88,6 @@
           - libnode72
         state: absent
         purge: yes
-        lock_timeout: 300
       register: apt_remove_nodejs
       until: apt_remove_nodejs is not failed
       retries: 10
@@ -105,7 +103,6 @@
         name: nodejs
         state: present
         update_cache: yes
-        lock_timeout: 300
       register: apt_install_nodejs
       until: apt_install_nodejs is not failed
       retries: 10
@@ -145,7 +142,6 @@
           - chromium-browser
           - xterm
         state: present
-        lock_timeout: 300
       register: apt_gui_packages
       until: apt_gui_packages is not failed
       retries: 10
@@ -202,7 +198,6 @@
       apt:
         name: gh
         state: present
-        lock_timeout: 300
       register: apt_install_gh
       until: apt_install_gh is not failed
       retries: 10

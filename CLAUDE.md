@@ -4,17 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Agent Billy is a stateless AI development teammate that operates as a GitHub App webhook server. Billy responds to GitHub issues in real-time, conducts multi-round clarification conversations, and executes configurable implementation workflows including full VM-based development environments.
+Agent Billy is a **production-ready** stateless AI development teammate that operates as a GitHub App webhook server. Billy responds to GitHub issues in real-time, conducts multi-round clarification conversations, and executes proven VM-based implementation workflows with complete automation.
 
-**Philosophy**: Billy is not a script—he's a teammate. A stateless, webhook-driven entity who senses GitHub events, thinks through LLM analysis, acts via GitHub APIs, and orchestrates development workflows.
+**Philosophy**: Billy is not a script—he's a teammate. A stateless, webhook-driven entity who senses GitHub events, thinks through LLM analysis, acts via GitHub APIs, and orchestrates complete development workflows from issue to pull request.
+
+**Current Status**: **MVP Complete** - Full end-to-end automation proven working. Now in **maintenance and improvement** phase.
 
 ## 🗺️ **CRITICAL DOCUMENTATION MAP - READ THESE FIRST**
 
-### **📋 START HERE - WORKING SESSION & CURRENT STATE**
-- **SESSION.md**: **MUST READ** - Current discoveries, what we're actively debugging/testing RIGHT NOW
-- **END-TO-END-TESTING.md**: **MUST READ** - Long-term memory of proven working steps via TOTAL AUTOMATION only
+### **📋 START HERE - MAINTENANCE & IMPROVEMENTS**
+- **SESSION.md**: **MUST READ** - Current maintenance tasks, improvements, and operational issues
+- **END-TO-END-TESTING.md**: **MUST READ** - **IRONCLAD** proven automation components - complete success documented
 
-⚠️ **CRITICAL**: END-TO-END-TESTING.md can ONLY be updated with explicit user permission. Updates require proof of TOTAL AUTOMATION success (GitHub label → final result, no manual intervention).
+⚠️ **CRITICAL**: END-TO-END-TESTING.md contains **production-proven** automation. Updates require explicit user permission and proof of TOTAL AUTOMATION success.
 
 ### **🚨 SOLVED ISSUES - NEVER QUESTION THESE**
 - **SSH_KEY_DEBUGGING.md**: **IF YOU HAVE ANY SSH ISSUES EVER, READ THIS** - 16 tested format combinations, base64 solution
@@ -33,9 +35,9 @@ Agent Billy is a stateless AI development teammate that operates as a GitHub App
 
 ---
 
-## Current Architecture (Stateless Webhook)
+## Current Architecture (Production-Ready Stateless Webhook)
 
-Billy's brain is now a lean webhook server:
+Billy's production architecture is a proven webhook server with complete automation:
 
 - **🎣 Webhook Server** (`/server`) - Real-time GitHub event processing
 - **👀 Perception** (`/perception`) - GitHub API reading and event processing
@@ -45,17 +47,21 @@ Billy's brain is now a lean webhook server:
 
 ## Commands
 
-### Current Operations
+### Production Operations
 - `npm install` - Install dependencies
-- `npm run build` - Compile TypeScript to JavaScript
-- `npm run start` - Start the stateless webhook server
+- `npm run build` - Compile TypeScript to JavaScript  
+- `npm run start` - Start production webhook server
 
-### Deployment
-- Railway deployment via GitHub App webhook integration
-- **Primary deployment**: `railway down -y && railway up` for all code changes (forces fresh deployment, clears Railway cache)
-- **Always use down/up approach**: Avoids cached deployment issues that cause inconsistent behavior
-- Environment variables: `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_INSTALLATION_ID`
-- Webhook secret: `GITHUB_WEBHOOK_SECRET` (optional but recommended)
+### Deployment (Production-Ready)
+- **Railway**: `railway down -y && railway up` for all deployments (clears cache)
+- **Environment**: All variables configured and tested in production
+- **Monitoring**: Complete coordinator conversation logging in Railway logs
+- **Automation**: Full GitHub issue → PR workflow with VM cleanup
+
+### Maintenance & Monitoring
+- Monitor Railway logs for coordinator conversations and errors
+- Check END-TO-END-TESTING.md before modifying proven automation components
+- VM cleanup is automatic - manual cleanup available if needed
 
 ## Key Files and Patterns
 
@@ -160,18 +166,37 @@ Billy's comments include:
 4. Implementation readiness statement
 5. Next steps and timeline
 
-## Repository Integration
+## Repository Integration & Playbook Configuration
 
-Target repositories need minimal configuration:
+Target repositories have flexible playbook hosting options:
 
+### **Option 1: Billy-Hosted Playbooks (Recommended for MVP)**
 ```yaml
 # .github/billy-config.yml
 billy:
   workflow_type: "vm_development"
+  playbook_source: "billy_internal"
+  playbook_name: "givegrove-environment"
   vm_development:
     vm_size: "c-4"
-    ansible_playbook: "ansible/claude-code-environment.yml"
 ```
+
+### **Option 2: Repository-Hosted Playbooks (Privacy Option)**  
+```yaml
+# .github/billy-config.yml
+billy:
+  workflow_type: "vm_development"
+  playbook_source: "repository"
+  ansible_playbook: ".github/billy/environment.yml"
+  vm_development:
+    vm_size: "c-4"
+```
+
+### **Security Considerations:**
+- **Secrets**: Always protected via ansible-vault encryption regardless of hosting
+- **Business Intelligence**: Playbooks reveal technology stack and deployment methodology
+- **Client Privacy**: Some organizations prefer deployment details remain private
+- **Recommendation**: Discuss with clients whether deployment automation should be public
 
 ## Development Notes
 

@@ -3,6 +3,8 @@ import { GitHubSensor } from '../perception/githubSensor';
 export interface BillyConfig {
   billy: {
     workflow_type: 'github_actions' | 'vm_development' | 'simple_comment' | 'custom';
+    playbook_source?: 'billy_internal' | 'repository';
+    playbook_name?: string;
     github_actions?: {
       workflow_file: string;
     };
@@ -116,6 +118,20 @@ export class ConfigReader {
         if (value) {
           if (!config.billy.vm_development) config.billy.vm_development = { vm_size: '', ansible_playbook: '' };
           config.billy.vm_development.ansible_playbook = value;
+        }
+      }
+
+      if (trimmed.includes('playbook_source:')) {
+        const value = trimmed.split(':')[1]?.split('#')[0]?.trim().replace(/['"]/g, '');
+        if (value === 'billy_internal' || value === 'repository') {
+          config.billy.playbook_source = value;
+        }
+      }
+
+      if (trimmed.includes('playbook_name:')) {
+        const value = trimmed.split(':')[1]?.split('#')[0]?.trim().replace(/['"]/g, '');
+        if (value) {
+          config.billy.playbook_name = value;
         }
       }
     }

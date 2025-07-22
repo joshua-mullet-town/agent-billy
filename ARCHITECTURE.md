@@ -3,7 +3,8 @@
 ## 🎯 High-Level Flow
 
 ```
-GitHub Issue → Billy Clarification → Implementation Workflow → Pull Request
+GitHub Issue → Billy Clarification → VM Provisioning → Environment Deployment → 
+Implementation & Testing → Pull Request → VM Cleanup
 ```
 
 ## 🔧 Billy's Responsibilities
@@ -27,57 +28,80 @@ GitHub Issue → Billy Clarification → Implementation Workflow → Pull Reques
 
 Billy supports multiple implementation strategies per repository:
 
-### `vm_development` (Default)
-- Provision DigitalOcean VM
-- Run Ansible setup from target repository  
-- Execute Claude Code + Playwright MCP
-- Create PR and teardown VM
+### `vm_development` (Production Ready)
+- Provision DigitalOcean VM with complete development environment
+- Deploy Ansible playbook (Billy-hosted or repository-hosted)
+- Execute Claude Code + Playwright MCP for implementation and testing
+- Create pull request with results
+- Automatic VM cleanup and resource management
 
-### `github_actions`
-- Trigger repository's GitHub Actions workflow
-- Pass issue context via repository dispatch
+### Other Workflow Types
+*Note: These workflow types are architectural placeholders and not currently production-ready:*
 
-### `simple_comment`
-- Post implementation comment only
-- No actual code generation
+- `github_actions` - Would trigger repository's GitHub Actions workflow
+- `simple_comment` - Would post implementation comment only  
+- `custom` - Would call repository-specified webhook
 
-### `custom`
-- Call repository-specified webhook
-- Full control over implementation process
+*Current focus is on perfecting the `vm_development` workflow for enterprise-grade reliability.*
 
 ## 📁 Repository Configuration
 
-**Target repositories only need:**
+**Billy supports two playbook hosting strategies:**
 
+### Option 1: Billy-Hosted Playbooks (Recommended)
 ```yaml
 # .github/billy-config.yml
 billy:
   workflow_type: "vm_development"
+  playbook_source: "billy_internal"  # Default
+  playbook_name: "givegrove-environment"  # Matches /playbooks/givegrove-environment.yml
   vm_development:
     vm_size: "c-4"
-    ansible_playbook: "ansible/claude-code-environment.yml"
 ```
 
-**Optional Ansible setup:**
+### Option 2: Repository-Hosted Playbooks (Privacy Option)
+```yaml
+# .github/billy-config.yml  
+billy:
+  workflow_type: "vm_development"
+  playbook_source: "repository"
+  ansible_playbook: ".github/billy/environment.yml"
+  vm_development:
+    vm_size: "c-4"
 ```
-/ansible/
-├── playbook.yml           # Environment setup
-└── secrets.yml            # App secrets template
+
+**Repository Ansible structure (if using repository-hosted):**
+```
+.github/billy/
+├── environment.yml        # Environment setup playbook
+└── secrets.yml           # Encrypted secrets via ansible-vault
 ```
 
-## 🔄 Handoff Points
+## 🔄 VM Development Workflow
 
-1. **Billy → Repository**: "Set up your environment per Ansible playbooks"
-2. **Repository → Billy**: "Environment ready, here's the config"  
-3. **Billy → Billy**: Execute development work with Claude Code
-4. **Billy → GitHub**: Post results and cleanup
+1. **GitHub → Billy**: Webhook triggers on "for-billy" label
+2. **Billy → DigitalOcean**: Provision Ubuntu VM with SSH access
+3. **Billy → VM**: Deploy Ansible playbook (Billy-hosted or repository-hosted)
+4. **VM → Billy**: Coordinator polling begins for implementation guidance
+5. **Billy → VM**: Send implementation prompts to Claude CLI
+6. **VM**: Execute code changes, testing with Playwright MCP
+7. **VM → GitHub**: Create pull request with implementation results
+8. **VM → Billy**: Signal workflow completion
+9. **Billy → DigitalOcean**: Automatic VM cleanup and resource deallocation
 
-## 🎛️ Configuration
+## 🎛️ Playbook Hosting Strategy
 
-Billy owns all orchestration logic and tool configurations. Repositories only specify what's project-specific.
+**Billy-Hosted Playbooks** (Default):
+- **Pros**: Centralized management, proven working configurations, rapid deployment
+- **Cons**: Deployment architecture visible in public Billy repository
+- **Best for**: Internal projects, open-source projects, rapid prototyping
 
-**Billy provides:** VM orchestration, Claude Code + MCP setup, GitHub integration  
-**Repository provides:** Environment setup instructions, project-specific secrets
+**Repository-Hosted Playbooks** (Privacy Option):
+- **Pros**: Complete deployment privacy, client control over environment details
+- **Cons**: Per-repository maintenance, configuration duplication
+- **Best for**: Commercial clients, proprietary applications with sensitive architecture
+
+**Security Model**: All sensitive data (tokens, credentials, secrets) are encrypted via ansible-vault regardless of hosting choice.
 
 ## 🎣 Webhook Event Processing
 
@@ -116,12 +140,23 @@ GITHUB_APP_INSTALLATION_ID=12345678
 # Webhook Security (Optional but recommended)
 GITHUB_WEBHOOK_SECRET=your_webhook_secret_here
 
-# LLM Provider (Optional - defaults to Claude)
+# LLM Provider (Required for Claude CLI in VM environments)
 ANTHROPIC_API_KEY=your_anthropic_key_here
 
 # VM Orchestration (Required for vm_development workflow)
 DIGITALOCEAN_TOKEN=your_digitalocean_token_here
+
+# VM SSH Access (Required - base64 encoded private key)
+SSH_PRIVATE_KEY=base64_encoded_ssh_private_key
+
+# Secrets Encryption (Required for ansible-vault)
+ANSIBLE_VAULT_PASSWORD=your_vault_password_here
 ```
+
+**Critical Notes:**
+- `SSH_PRIVATE_KEY` must be base64 encoded for Railway deployment
+- All sensitive playbook data encrypted via ansible-vault using `ANSIBLE_VAULT_PASSWORD`
+- VM lifecycle includes automatic creation, deployment, execution, and cleanup
 
 ### GitHub App Setup
 1. Create GitHub App at `https://github.com/settings/apps`

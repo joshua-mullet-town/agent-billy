@@ -289,10 +289,11 @@ Enhanced coordinator prompt with sophisticated detection logic:
 - **Total E2E Time**: Expect 6-12 minutes from issue label → working VM environment
 
 **Step-by-Step Process:**
-1. **Deploy to Railway**: `railway down -y && railway up` (wait 2+ minutes for completion)
-2. **Create/Label Issue**: Add "for-billy" label to trigger webhook  
-3. **Monitor Railway Logs**: Watch for webhook within 30 seconds of labeling
-4. **Extract VM IP**: Look for VM IP in Railway logs within ~1 minute
+1. **🚨 CRITICAL: Push Changes First**: `git add . && git commit -m "..." && git push` (Railway needs latest code)
+2. **Deploy to Railway**: `railway down -y && railway up` (wait 2+ minutes for completion)
+3. **Create/Label Issue**: Add "for-billy" label to trigger webhook  
+4. **Monitor Railway Logs**: Watch for webhook within 30 seconds of labeling
+5. **Extract VM IP**: Look for VM IP in Railway logs within ~1 minute
 5. **SSH into VM**: `ssh -i ~/.ssh/id_ed25519 ubuntu@VM_IP` to monitor setup progress
 6. **Monitor Ansible**: `tail -f /home/ubuntu/automation.log` (3-8 minute process)
 7. **Check Coordinator**: `tail -f /home/ubuntu/coordinator.log` for Claude CLI execution
@@ -333,13 +334,38 @@ Enhanced coordinator prompt with sophisticated detection logic:
   - Working system uses `uploadFilesAndStartVMAutomation()` → `generateVMAutomationScript()` flow
   - **TODO**: Remove commented code after confirming end-to-end test works successfully
 
-### **🔧 CURRENT WORK: VM-SIDE ISSUE CONTEXT - UNBLOCK FULL AUTOMATION**
+### **🚨 CRITICAL: ALWAYS USE MAIN BRANCH**
 
-**🎯 PRIMARY GOAL**: Enable complete end-to-end automation flow:
-- ✅ **Implementation phase** (75% working - Claude CLI implements correctly but coordinator loops)
-- 🔄 **Testing phase** (blocked by coordinator communication)
-- 🔄 **PR creation phase** (blocked by coordinator communication)  
-- 🔄 **VM cleanup** (blocked by coordinator communication)
+**NEVER work on other branches** - The `clean-vm-context` branch stripped out all working functionality:
+- ❌ Missing `uploadFilesAndStartVMAutomation()` handoff mechanism
+- ❌ Missing coordinator polling architecture  
+- ❌ Missing proven working playbook configurations
+- ❌ Minimal cloud-config with no automation files
+
+**ALWAYS use main branch** which contains:
+- ✅ Complete handoff mechanism that uploads automation files
+- ✅ Proven working coordinator architecture
+- ✅ Evidence of complete automation success (Issue #1170 → PR #1172)
+- ✅ All working playbook configurations
+
+### **🎉 HANDOFF MECHANISM VERIFIED WORKING! (Issue #1186)**
+
+**✅ MAJOR SUCCESS - HANDOFF ARCHITECTURE PROVEN:**
+- ✅ **Railway → VM Handoff**: Files uploaded successfully (automation.sh, playbook.yml, .vault_pass)
+- ✅ **VM Independence**: Ansible automation ran independently after Railway timeout
+- ✅ **21/22 Ansible Tasks Success**: Complete environment setup except repository cloning
+- ✅ **Retry Mechanisms Working**: APT lock issues resolved automatically
+- ✅ **System Dependencies**: All packages installed (Node.js, npm, system tools)
+
+**❌ KNOWN AUTOMATION BLOCKER #1 CONFIRMED:**
+- **Repository Cloning**: Failed with vault variable authentication issue (exact same as documented)
+- **Error**: `fatal: could not read Password for 'https://ghp_...@github.com': No such device or address`
+- **Impact**: Claude CLI never installed, coordinator polling never started
+- **Status**: This is the exact issue documented in END-TO-END-TESTING.md with known solution
+
+**🎯 NEXT REQUIRED FIX**: Apply the repository cloning authentication fix from END-TO-END-TESTING.md
+- **Solution**: Use direct GitHub token format instead of vault variables
+- **Expected Result**: Full automation completion including Claude CLI + coordinator phases
 
 **🔍 ROOT CAUSE ANALYSIS - COORDINATOR COMMUNICATION:**
 

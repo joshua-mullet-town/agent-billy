@@ -284,8 +284,31 @@ I'm now implementing this feature using a dedicated development environment.
       
       // Get VM config from repository config or use defaults  
       const vmSize = config?.billy.vm_development?.vm_size || 's-2vcpu-2gb';
-      // TEMPORARY: Use local test playbook until proven working end-to-end
-      const playbookPath = 'test-complete-environment.yml';
+      
+      // Playbook Configuration Strategy (with backward compatibility)
+      let playbookPath = '';
+      const playbookSource = config?.billy.playbook_source || 'billy_internal';
+      
+      if (playbookSource === 'billy_internal') {
+        // Option 1: Use Billy's hosted playbooks (recommended for MVP)
+        const playbookName = config?.billy.playbook_name || 'givegrove-environment';
+        playbookPath = `playbooks/${playbookName}.yml`;
+        console.log(`📋 Using Billy-hosted playbook: ${playbookPath}`);
+      } else if (playbookSource === 'repository') {
+        // Option 2: Use repository's own playbook (privacy option)
+        playbookPath = config?.billy.vm_development?.ansible_playbook || '.github/billy/environment.yml';
+        console.log(`📋 Using repository-hosted playbook: ${playbookPath}`);
+      } else {
+        // Backward compatibility: Check for legacy ansible_playbook config
+        if (config?.billy.vm_development?.ansible_playbook) {
+          playbookPath = config.billy.vm_development.ansible_playbook;
+          console.log(`📋 Using legacy playbook config: ${playbookPath}`);
+        } else {
+          // Default fallback
+          playbookPath = 'playbooks/givegrove-environment.yml';
+          console.log(`📋 Using default playbook: ${playbookPath}`);
+        }
+      }
       
       console.log(`🔧 VM Config - Size: ${vmSize}, Playbook: ${playbookPath}`);
 
@@ -409,7 +432,7 @@ I'm now implementing this feature using a dedicated development environment.
       // We spent hours debugging this approach - it's fundamentally broken for long-running tasks
       // USE VM HANDOFF APPROACH INSTEAD: Upload files to VM, let VM run Ansible independently
       console.log(`🔧 Starting VM handoff automation approach on VM ${readyVM.publicIp}`);
-      const automationStarted = await this.uploadFilesAndStartVMAutomation(readyVM.publicIp, owner, repo, playbookPath);
+      const automationStarted = await this.uploadFilesAndStartVMAutomation(readyVM.publicIp, owner, repo, playbookPath, issue.number);
       
       if (!automationStarted) {
         await this.actions.commentOnIssue(owner, repo, issue.number, 
@@ -428,7 +451,7 @@ ssh ubuntu@${readyVM.publicIp} "which ansible && ansible --version"
 
 **Manual Testing:**
 \`\`\`bash
-ansible-playbook -i ${readyVM.publicIp}, test-complete-environment.yml --check
+ansible-playbook -i ${readyVM.publicIp}, playbooks/givegrove-environment.yml --check
 \`\`\`
 
 *VM available for manual debugging at ${readyVM.publicIp}*`);
@@ -508,6 +531,9 @@ Please check the configuration and try again.
     }
   }
 
+  // COMMENTED OUT - UNUSED LEGACY METHOD CAUSING BUILD ERRORS
+  // TODO: Clean up this unused code after confirming uploadFilesAndStartVMAutomation works
+  /*
   // SSH KICKOFF: Start background automation script on VM  
   private async startBackgroundAutomation(vmIp: string, owner: string, repo: string, issue: any): Promise<boolean> {
     try {
@@ -607,7 +633,11 @@ echo "Automation script ready" >> /home/ubuntu/billy-status.log`
       return false;
     }
   }
+  */
 
+  // COMMENTED OUT - UNUSED LEGACY METHOD CAUSING BUILD ERRORS  
+  // TODO: Clean up this unused code after confirming uploadFilesAndStartVMAutomation works
+  /*
   // Generate automation script that runs independently on VM
   private generateAutomationScript(owner: string, repo: string, issue: any): string {
     return `#!/bin/bash
@@ -617,9 +647,19 @@ set -e
 echo "=== Billy Automation Script Started at $(date) ===" >> /home/ubuntu/automation.log
 echo "VM is now independent of Railway - full automation starting" >> /home/ubuntu/automation.log
 
-# Download Ansible playbook and secrets
+# Download Ansible playbook and secrets  
 echo "Downloading Ansible playbook..." >> /home/ubuntu/automation.log
-curl -s -L "https://raw.githubusercontent.com/joshua-mullet-town/agent-billy/main/test-complete-environment.yml" -o /home/ubuntu/playbook.yml
+
+${playbookSource === 'repository' 
+  ? `# Download from target repository
+curl -s -L "https://raw.githubusercontent.com/${owner}/${repo}/main/${playbookPath}" -o /home/ubuntu/playbook.yml
+if [ $? -ne 0 ]; then
+  echo "Failed to download repository playbook, falling back to Billy default" >> /home/ubuntu/automation.log
+  curl -s -L "https://raw.githubusercontent.com/joshua-mullet-town/agent-billy/main/playbooks/givegrove-environment.yml" -o /home/ubuntu/playbook.yml
+fi`
+  : `# Download from Billy's repository
+curl -s -L "https://raw.githubusercontent.com/joshua-mullet-town/agent-billy/main/${playbookPath}" -o /home/ubuntu/playbook.yml`}
+
 curl -s -L "https://raw.githubusercontent.com/joshua-mullet-town/agent-billy/main/secrets.yml" -o /home/ubuntu/secrets.yml
 
 echo "Creating inventory..." >> /home/ubuntu/automation.log
@@ -662,6 +702,7 @@ ISSUE_EOF
 echo "Automation script completed successfully" >> /home/ubuntu/billy-status.log
 `;
   }
+  */
 
   // PHASE 1: Wait for cloud-init completion (replaces SSH test due to Railway limitations)
   private async waitForVMReadiness(vmIp: string): Promise<boolean> {
@@ -879,7 +920,7 @@ echo "Automation script completed successfully" >> /home/ubuntu/billy-status.log
   }
 
   // VM Handoff Approach: Upload files to VM and let VM run Ansible independently  
-  private async uploadFilesAndStartVMAutomation(vmIp: string, owner: string, repo: string, playbookPath: string): Promise<boolean> {
+  private async uploadFilesAndStartVMAutomation(vmIp: string, owner: string, repo: string, playbookPath: string, issueNumber: number): Promise<boolean> {
     try {
       console.log(`🚀 Starting VM handoff automation on ${vmIp}`);
       
@@ -910,7 +951,7 @@ echo "Automation script completed successfully" >> /home/ubuntu/billy-status.log
 
       // Step 4: Create and upload automation script
       console.log(`📤 Creating and uploading automation script to VM...`);
-      const automationScript = this.generateVMAutomationScript(owner, repo, vmIp);
+      const automationScript = this.generateVMAutomationScript(owner, repo, vmIp, issueNumber);
       const scriptPath = '/tmp/vm-automation.sh';
       fs.writeFileSync(scriptPath, automationScript, { mode: 0o755 });
       
@@ -995,7 +1036,7 @@ echo "Automation script completed successfully" >> /home/ubuntu/billy-status.log
   }
 
   // Generate automation script that runs on VM
-  private generateVMAutomationScript(owner: string, repo: string, vmIp: string): string {
+  private generateVMAutomationScript(owner: string, repo: string, vmIp: string, issueNumber: number): string {
     return `#!/bin/bash
 set -e
 
@@ -1030,10 +1071,47 @@ all:
       vm_ip: ${vmIp}
 EOF
 
-# Run Ansible playbook with vault password
+# Create issue context file for coordinator communication
+echo "Creating issue context file..." | tee -a /home/ubuntu/automation.log
+cat > /home/ubuntu/issue-context.json << 'ISSUE_CONTEXT_EOF'
+{
+  "number": ${issueNumber},
+  "title": "Issue title will be fetched by GitHub CLI",
+  "body": "Issue body will be fetched by GitHub CLI",
+  "created_at": "$(date -Iseconds)",
+  "repository": "${owner}/${repo}"
+}
+ISSUE_CONTEXT_EOF
+
+# Use GitHub CLI to fetch and update issue context with real data
+echo "Fetching issue details via GitHub CLI..." | tee -a /home/ubuntu/automation.log
+if command -v gh &> /dev/null; then
+  # Extract issue details using GitHub CLI and create proper JSON
+  ISSUE_TITLE=$(gh issue view ${issueNumber} --json title --jq '.title' 2>/dev/null || echo "Unknown Issue")
+  ISSUE_BODY=$(gh issue view ${issueNumber} --json body --jq '.body' 2>/dev/null || echo "No description")
+  ISSUE_URL=$(gh issue view ${issueNumber} --json url --jq '.url' 2>/dev/null || echo "")
+  
+  # Create complete issue context JSON
+  cat > /home/ubuntu/issue-context.json << REAL_ISSUE_EOF
+{
+  "number": ${issueNumber},
+  "title": "\$ISSUE_TITLE",
+  "body": "\$ISSUE_BODY", 
+  "url": "\$ISSUE_URL",
+  "repository": "${owner}/${repo}",
+  "created_at": "$(date -Iseconds)"
+}
+REAL_ISSUE_EOF
+  
+  echo "Issue context created: \$ISSUE_TITLE" | tee -a /home/ubuntu/automation.log
+else
+  echo "Warning: GitHub CLI not available, using basic issue context" | tee -a /home/ubuntu/automation.log
+fi
+
+# Run Ansible playbook with vault password and issue number
 echo "Starting Ansible playbook execution..." | tee -a /home/ubuntu/automation.log
 cd /home/ubuntu
-ansible-playbook -i inventory.yml playbook.yml --vault-password-file .vault_pass -v >> automation.log 2>&1
+ansible-playbook -i inventory.yml playbook.yml --vault-password-file .vault_pass -v --extra-vars "issue_number=${issueNumber}" >> automation.log 2>&1
 
 echo "=== Billy VM Automation Completed at $(date) ===" | tee -a /home/ubuntu/automation.log
 echo "AUTOMATION_COMPLETE" > /home/ubuntu/completion-status.log
@@ -1246,64 +1324,215 @@ I'm ready to execute your custom implementation workflow.
 
   // Coordinator endpoint for step-by-step Claude CLI guidance
   public async coordinatorNextStep(req: any, res: any): Promise<void> {
-    const { vm_id, issue_context, recent_output, current_step } = req.body;
+    const { vm_ip, vm_id, issue_context, recent_output, current_step, status, phase, issue_number } = req.body;
     
-    console.log(`🔧 Coordinator analyzing step for VM ${vm_id}`);
-    console.log(`📋 Current step: ${current_step}`);
-    console.log(`📝 Recent output: ${recent_output?.substring(0, 200)}...`);
+    console.log(`\n🤖 ================== COORDINATOR CONVERSATION ==================`);
+    console.log(`🔧 VM: ${vm_ip || vm_id}`);
+    console.log(`📋 Phase: ${phase}`);
+    console.log(`📋 Status: ${status}`);
+    console.log(`📋 Issue: ${issue_number || 'unknown'}`);
+    console.log(`📝 Recent Claude CLI Output:`);
+    if (recent_output) {
+      console.log(`┌─ Claude CLI Output (${recent_output.length} chars) ─┐`);
+      console.log(recent_output);
+      console.log(`└─ End Claude CLI Output ─┘`);
+    } else {
+      console.log(`❌ NO CLAUDE CLI OUTPUT PROVIDED`);
+    }
 
-    // Determine next step based on Claude CLI output
-    const coordinatorPrompt = `
-GITHUB ISSUE CONTEXT:
-${issue_context}
+    // Extract issue number for branch naming
+    let dynamicIssueNumber = issue_number;
+    if (!dynamicIssueNumber && issue_context) {
+      // Try to extract from issue_context if available
+      const issueMatch = String(issue_context).match(/issue[#\s]*(\d+)/i);
+      if (issueMatch) {
+        dynamicIssueNumber = issueMatch[1];
+      }
+    }
+    
+    // Fallback to extracting from VM IP logs if needed
+    if (!dynamicIssueNumber) {
+      console.log(`⚠️ No issue number provided, using default for branch naming`);
+      dynamicIssueNumber = 'unknown';
+    }
+    
+    console.log(`🎯 Using issue number for branch naming: ${dynamicIssueNumber}`);
 
-RECENT CLAUDE CLI OUTPUT:
-${recent_output}
+    // NEW: Use VM-provided issue context (no GitHub API calls needed)
+    let githubIssueContext = null;
+    if (issue_context) {
+      try {
+        console.log(`📥 Using VM-provided issue context...`);
+        // Parse the issue context sent from VM
+        githubIssueContext = typeof issue_context === 'string' ? JSON.parse(issue_context) : issue_context;
+        console.log(`✅ Issue context received: "${githubIssueContext.title}"`);
+        console.log(`📄 Issue body: ${githubIssueContext.body?.substring(0, 100)}...`);
+      } catch (error) {
+        console.log(`❌ Failed to parse VM-provided issue context:`, error);
+        console.log(`🔧 Will fall back to generic prompt without context`);
+      }
+    } else if (dynamicIssueNumber && dynamicIssueNumber !== 'unknown') {
+      console.log(`⚠️ No issue context provided by VM, falling back to GitHub API...`);
+      // Fallback to GitHub API if VM doesn't provide context (backward compatibility)
+      try {
+        console.log(`📥 Fetching GitHub issue context for #${dynamicIssueNumber}...`);
+        githubIssueContext = await this.sensor.getIssue('south-bend-code-works', 'GiveGrove', parseInt(dynamicIssueNumber));
+        if (githubIssueContext) {
+          console.log(`✅ GitHub API fallback successful: "${githubIssueContext.title}"`);
+        } else {
+          console.log(`⚠️ GitHub API fallback returned null`);
+        }
+      } catch (error) {
+        console.log(`❌ GitHub API fallback failed:`, error);
+      }
+    } else {
+      console.log(`⚠️ No issue context or valid issue number available`);
+    }
 
-BILLY'S 3-PHASE WORKFLOW:
-You must execute these phases in order:
-1. IMPLEMENT: Read the GitHub issue and make the required code changes
-2. TEST: Test the changes using Playwright MCP browser automation (click login button to verify functionality)
-3. CREATE PR: Create a pull request with the changes
+    // INTELLIGENT COORDINATOR LOGIC with comprehensive logging
+    
+    let nextPrompt = '';
+    let isComplete = false;
+    
+    // If recent_output is provided, use intelligent detection
+    if (recent_output && recent_output.length > 10) {
+      console.log(`📝 Analyzing Claude CLI output: ${recent_output.substring(0, 100)}...`);
+      
+      // Check for testing completion indicators
+      const testingComplete = recent_output.includes('successfully tested') || 
+                              recent_output.includes('Test Results') ||
+                              recent_output.includes('testing completed') ||
+                              recent_output.includes('Playwright MCP') ||
+                              recent_output.includes('Login page renders') ||
+                              recent_output.includes('browser environment');
+      
+      // Check for implementation completion indicators  
+      const implementationComplete = recent_output.includes('implemented successfully') ||
+                                     recent_output.includes('already been implemented') ||
+                                     recent_output.includes('successfully applied') ||
+                                     recent_output.includes('change was successful');
+      
+      // Check for PR completion
+      const prComplete = recent_output.includes('pull request') ||
+                         recent_output.includes('PR created') ||
+                         recent_output.includes('branch created and pushed');
+      
+      if (prComplete) {
+        nextPrompt = 'WORKFLOW_COMPLETE';
+        isComplete = true;
+      } else if (testingComplete) {
+        nextPrompt = `CREATE_PULL_REQUEST: Create a feature branch named "agent-billy/feature/gh-${dynamicIssueNumber}" (without timestamps), commit the changes, and create a pull request with the implemented changes and test results.`;
+      } else if (implementationComplete) {
+        nextPrompt = 'TEST_WITH_PLAYWRIGHT_MCP: Use Playwright MCP to test the frontend by clicking the login button to verify the changes work in a real browser.';
+      } else {
+        // FIXED: Include specific GitHub issue context in implementation prompt
+        if (githubIssueContext) {
+          nextPrompt = `IMPLEMENT_GITHUB_ISSUE #${dynamicIssueNumber}: "${githubIssueContext.title}"
 
-COORDINATOR INSTRUCTIONS:
-Look at the recent Claude CLI output and decide what should happen next:
+${githubIssueContext.body || 'No description provided'}
 
-- If no code changes have been made yet → Return: "IMPLEMENT_GITHUB_ISSUE: Read the GitHub issue and make the required code changes."
-- If code changes were made but no browser testing occurred → Return: "TEST_WITH_PLAYWRIGHT_MCP: Use Playwright MCP to test the frontend by clicking the login button to verify the changes work in a real browser."
-- If Playwright testing was completed successfully (output contains browser testing results) → Return: "CREATE_PULL_REQUEST: Create a feature branch named 'agent-billy/feature/gh-{issue_number}', commit the changes, and create a pull request with the implemented changes and test results."
-- If a pull request was already created → Return: "WORKFLOW_COMPLETE"
+Please implement this specific GitHub issue. Make the required changes as described above.`;
+        } else {
+          // Fallback to generic prompt if no context available
+          nextPrompt = 'IMPLEMENT_GITHUB_ISSUE: Read the GitHub issue and make the required code changes.';
+        }
+      }
+    } else {
+      // Fallback: Use simple phase-based progression (current VM script behavior)
+      console.log(`⚠️ No recent_output provided, using phase-based progression`);
+      
+      if (phase === 'implementation') {
+        // FIXED: Include GitHub issue context in fallback implementation prompt
+        if (githubIssueContext) {
+          nextPrompt = `IMPLEMENT_GITHUB_ISSUE #${dynamicIssueNumber}: "${githubIssueContext.title}"
 
-BRANCH NAMING CONVENTION: Use format 'agent-billy/feature/gh-{issue_number}' for feature branches.
+${githubIssueContext.body || 'No description provided'}
 
-Provide the exact prompt for Claude CLI based on what needs to happen next. Be specific about using Playwright MCP for testing and proper branch naming for PRs.
-`;
+Please implement this specific GitHub issue. Make the required changes as described above.`;
+        } else {
+          nextPrompt = 'IMPLEMENT_GITHUB_ISSUE: Read the GitHub issue and make the required code changes.';
+        }
+      } else if (phase === 'testing') {
+        nextPrompt = 'TEST_WITH_PLAYWRIGHT_MCP: Use Playwright MCP to test the frontend by clicking the login button to verify the changes work in a real browser.';
+      } else if (phase === 'pr_creation') {
+        nextPrompt = `CREATE_PULL_REQUEST: Create a feature branch named "agent-billy/feature/gh-${dynamicIssueNumber}" (without timestamps), commit the changes, and create a pull request with the implemented changes and test results.`;
+      } else {
+        // Default to implementation phase with context
+        if (githubIssueContext) {
+          nextPrompt = `IMPLEMENT_GITHUB_ISSUE #${dynamicIssueNumber}: "${githubIssueContext.title}"
+
+${githubIssueContext.body || 'No description provided'}
+
+Please implement this specific GitHub issue. Make the required changes as described above.`;
+        } else {
+          nextPrompt = 'IMPLEMENT_GITHUB_ISSUE: Read the GitHub issue and make the required code changes.';
+        }
+      }
+    }
+    
+    console.log(`\n📤 COORDINATOR RESPONSE:`);
+    console.log(`┌─ Sending to VM ─┐`);
+    console.log(`Next Prompt: ${nextPrompt}`);
+    console.log(`Complete: ${isComplete}`);
+    console.log(`└─ End Response ─┘`);
+    console.log(`🤖 ===================== END CONVERSATION =====================\n`);
+    
+    res.statusCode = 200;
+    res.end(JSON.stringify({ 
+      next_prompt: nextPrompt,
+      complete: isComplete,
+      timestamp: new Date().toISOString()
+    }));
+  }
+
+  // Coordinator workflow completion endpoint - triggers VM cleanup
+  public async coordinatorWorkflowComplete(req: any, res: any): Promise<void> {
+    const { vm_ip, vm_id, issue_number } = req.body;
+    
+    console.log(`\n🏁 ================== WORKFLOW COMPLETE ==================`);
+    console.log(`🔧 VM: ${vm_ip || vm_id}`);
+    console.log(`📋 Issue: ${issue_number || 'unknown'}`);
+    console.log(`🧹 Triggering VM cleanup...`);
 
     try {
-      const response = await callLLM({
-        prompt: coordinatorPrompt,
-        options: { maxTokens: 1000 }
-      });
+      // Find the VM by IP address to get its ID for cleanup
+      const vmOrchestrator = new VMOrchestrator();
+      const vms = await vmOrchestrator.listVMs();
+      const targetVM = vms.find(vm => vm.publicIp === vm_ip);
       
-      const nextPrompt = response.content.trim();
-      const isComplete = nextPrompt.includes('WORKFLOW_COMPLETE');
-      
-      console.log(`✅ Coordinator determined next step: ${nextPrompt.substring(0, 100)}...`);
-      
-      res.statusCode = 200;
-      res.end(JSON.stringify({ 
-        next_prompt: nextPrompt,
-        complete: isComplete,
-        timestamp: new Date().toISOString()
-      }));
+      if (targetVM) {
+        console.log(`🎯 Found VM ${targetVM.id} at ${targetVM.publicIp}`);
+        await vmOrchestrator.destroyVM(targetVM.id);
+        console.log(`✅ VM ${targetVM.id} cleanup initiated successfully`);
+        
+        res.statusCode = 200;
+        res.end(JSON.stringify({ 
+          status: 'success',
+          message: `VM cleanup initiated for ${vm_ip}`,
+          vm_id: targetVM.id,
+          timestamp: new Date().toISOString()
+        }));
+      } else {
+        console.log(`⚠️ VM not found with IP ${vm_ip}`);
+        res.statusCode = 404;
+        res.end(JSON.stringify({ 
+          status: 'error',
+          message: `VM not found with IP ${vm_ip}`,
+          timestamp: new Date().toISOString()
+        }));
+      }
     } catch (error) {
-      console.error('❌ Coordinator error:', error);
+      console.error('❌ VM cleanup error:', error);
       res.statusCode = 500;
       res.end(JSON.stringify({ 
-        error: 'Coordinator analysis failed',
+        status: 'error',
+        message: 'Failed to initiate VM cleanup',
+        error: error instanceof Error ? error.message : String(error),
         timestamp: new Date().toISOString()
       }));
     }
+    
+    console.log(`🏁 ===================== CLEANUP COMPLETE =====================\n`);
   }
 
 
@@ -1558,7 +1787,7 @@ Provide the exact prompt for Claude CLI based on what needs to happen next. Be s
     // Check specific files we need
     const filesToCheck = [
       'secrets.yml',
-      'test-complete-environment.yml',
+      'playbooks/givegrove-environment.yml',
       '.vault_pass',
       'package.json',
       'tsconfig.json'
@@ -1883,6 +2112,27 @@ Provide the exact prompt for Claude CLI based on what needs to happen next. Be s
               res.statusCode = 500;
               res.end(JSON.stringify({ 
                 error: 'Coordinator processing failed',
+                timestamp: new Date().toISOString()
+              }));
+            }
+          });
+
+        } else if (req.method === 'POST' && req.url === '/coordinator/workflow-complete') {
+          let body = '';
+          
+          req.on('data', chunk => {
+            body += chunk.toString();
+          });
+
+          req.on('end', async () => {
+            try {
+              const requestBody = JSON.parse(body);
+              await this.coordinatorWorkflowComplete({ body: requestBody }, res);
+            } catch (error) {
+              console.error('❌ Workflow complete error:', error);
+              res.statusCode = 500;
+              res.end(JSON.stringify({ 
+                error: 'Workflow completion failed',
                 timestamp: new Date().toISOString()
               }));
             }

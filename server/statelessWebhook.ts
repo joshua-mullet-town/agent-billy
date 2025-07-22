@@ -1423,7 +1423,15 @@ I'm ready to execute your custom implementation workflow.
       } else if (testingComplete) {
         nextPrompt = `CREATE_PULL_REQUEST: Create a feature branch named "agent-billy/feature/gh-${dynamicIssueNumber}" (without timestamps), commit the changes, and create a pull request with the implemented changes and test results.`;
       } else if (implementationComplete) {
-        nextPrompt = 'TEST_WITH_PLAYWRIGHT_MCP: Use Playwright MCP to test the frontend by clicking the login button to verify the changes work in a real browser.';
+        nextPrompt = `TEST_WITH_PLAYWRIGHT_MCP: Use Playwright MCP to test the frontend in a real browser. 
+
+**Testing Instructions:**
+- Navigate to the application and verify your changes work correctly
+- If login is required for testing, use these credentials:
+  - Email: billy-testing-givegrove@gmail.com
+  - Password: TestBilly2024!
+- Test both before and after login if applicable
+- Verify all implemented functionality works as expected`;
       } else {
         // FIXED: Include specific GitHub issue context in implementation prompt
         if (githubIssueContext) {
@@ -1453,7 +1461,15 @@ Please implement this specific GitHub issue. Make the required changes as descri
           nextPrompt = 'IMPLEMENT_GITHUB_ISSUE: Read the GitHub issue and make the required code changes.';
         }
       } else if (phase === 'testing') {
-        nextPrompt = 'TEST_WITH_PLAYWRIGHT_MCP: Use Playwright MCP to test the frontend by clicking the login button to verify the changes work in a real browser.';
+        nextPrompt = `TEST_WITH_PLAYWRIGHT_MCP: Use Playwright MCP to test the frontend in a real browser. 
+
+**Testing Instructions:**
+- Navigate to the application and verify your changes work correctly
+- If login is required for testing, use these credentials:
+  - Email: billy-testing-givegrove@gmail.com
+  - Password: TestBilly2024!
+- Test both before and after login if applicable
+- Verify all implemented functionality works as expected`;
       } else if (phase === 'pr_creation') {
         nextPrompt = `CREATE_PULL_REQUEST: Create a feature branch named "agent-billy/feature/gh-${dynamicIssueNumber}" (without timestamps), commit the changes, and create a pull request with the implemented changes and test results.`;
       } else {

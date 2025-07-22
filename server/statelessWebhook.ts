@@ -1427,9 +1427,9 @@ I'm ready to execute your custom implementation workflow.
 
 **Testing Instructions:**
 - Navigate to the application and verify your changes work correctly
-- If login is required for testing, use these credentials:
-  - Email: billy-testing-givegrove@gmail.com
-  - Password: TestBilly2024!
+- If login is required for testing, use the GiveGrove test credentials from environment variables:
+  - Email: $GIVEGROVE_TEST_EMAIL
+  - Password: $GIVEGROVE_TEST_PASSWORD
 - Test both before and after login if applicable
 - Verify all implemented functionality works as expected`;
       } else {
@@ -1465,9 +1465,9 @@ Please implement this specific GitHub issue. Make the required changes as descri
 
 **Testing Instructions:**
 - Navigate to the application and verify your changes work correctly
-- If login is required for testing, use these credentials:
-  - Email: billy-testing-givegrove@gmail.com
-  - Password: TestBilly2024!
+- If login is required for testing, use the GiveGrove test credentials from environment variables:
+  - Email: $GIVEGROVE_TEST_EMAIL
+  - Password: $GIVEGROVE_TEST_PASSWORD
 - Test both before and after login if applicable
 - Verify all implemented functionality works as expected`;
       } else if (phase === 'pr_creation') {

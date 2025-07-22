@@ -63,19 +63,6 @@ Consider these business-focused factors for GiveGrove:
 - **Accessibility**: Are there users with specific needs this should address?
 - **Timing**: When should users see this feature (during events, before, after)?
 - **Scope**: Which parts of the platform should this affect?
-- **Testing Requirements**: Will testing this feature require login credentials?
-
-## Testing Authentication Requirements
-
-**When to ask about login requirements:**
-- Feature affects user dashboard, profile, or settings
-- Changes involve donation/bidding functionality
-- Modifications to campaign management tools
-- Updates to payment or checkout flow
-- Any feature behind the "Sign in" requirement
-
-**Standard question format:**
-"Will testing this feature require user login? (Some parts of GiveGrove are protected and need authentication to test properly)"
 
 ## Response Format
 
@@ -121,7 +108,6 @@ You must respond with a JSON object in one of these formats:
 - "Where exactly is the login button? (homepage header, mobile menu, both?)"
 - "What happens when clicked - nothing at all, error message, or page refresh?"
 - "Which users are affected - all users or specific browsers/devices?"
-- "Will this feature require user login to test? (Some parts of GiveGrove are behind authentication)"
 
 **Keep questions concise:**
 - Include just enough context to help them answer accurately

@@ -1426,11 +1426,8 @@ I'm ready to execute your custom implementation workflow.
         nextPrompt = `TEST_WITH_PLAYWRIGHT_MCP: Use Playwright MCP to test the frontend in a real browser. 
 
 **Testing Instructions:**
-- Navigate to the application and verify your changes work correctly
-- If login is required for testing, use the GiveGrove test credentials from environment variables:
-  - Email: $GIVEGROVE_TEST_EMAIL
-  - Password: $GIVEGROVE_TEST_PASSWORD
-- Test both before and after login if applicable
+- Navigate to the application and verify your changes work correctly  
+- Focus on testing public-facing functionality (no login required for this test)
 - Verify all implemented functionality works as expected`;
       } else {
         // FIXED: Include specific GitHub issue context in implementation prompt
@@ -1464,11 +1461,8 @@ Please implement this specific GitHub issue. Make the required changes as descri
         nextPrompt = `TEST_WITH_PLAYWRIGHT_MCP: Use Playwright MCP to test the frontend in a real browser. 
 
 **Testing Instructions:**
-- Navigate to the application and verify your changes work correctly
-- If login is required for testing, use the GiveGrove test credentials from environment variables:
-  - Email: $GIVEGROVE_TEST_EMAIL
-  - Password: $GIVEGROVE_TEST_PASSWORD
-- Test both before and after login if applicable
+- Navigate to the application and verify your changes work correctly  
+- Focus on testing public-facing functionality (no login required for this test)
 - Verify all implemented functionality works as expected`;
       } else if (phase === 'pr_creation') {
         nextPrompt = `CREATE_PULL_REQUEST: Create a feature branch named "agent-billy/feature/gh-${dynamicIssueNumber}" (without timestamps), commit the changes, and create a pull request with the implemented changes and test results.`;

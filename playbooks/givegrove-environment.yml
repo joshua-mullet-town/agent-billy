@@ -261,20 +261,6 @@
         create: yes
       become: yes
 
-    # 6.3. CONFIGURE GIVEGROVE TEST CREDENTIALS  
-    - name: Set GiveGrove test email in system environment
-      lineinfile:
-        path: /etc/environment
-        line: 'GIVEGROVE_TEST_EMAIL="{{ vault_givegrove_test_email }}"'
-        create: yes
-      become: yes
-
-    - name: Set GiveGrove test password in system environment
-      lineinfile:
-        path: /etc/environment
-        line: 'GIVEGROVE_TEST_PASSWORD="{{ vault_givegrove_test_password }}"'
-        create: yes
-      become: yes
 
     - name: Test Claude Code CLI authentication (direct API key export)
       shell: |
@@ -588,8 +574,6 @@
           
           # Export environment variables for Claude CLI
           export ANTHROPIC_API_KEY="{{ vault_anthropic_api_key }}"
-          export GIVEGROVE_TEST_EMAIL="{{ vault_givegrove_test_email }}"
-          export GIVEGROVE_TEST_PASSWORD="{{ vault_givegrove_test_password }}"
           
           echo "$(date): Coordinator polling started" >> $LOG_FILE
           

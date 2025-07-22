@@ -80,12 +80,31 @@ ANTHROPIC_API_KEY=sk-ant-your-anthropic-key
 
 # VM Orchestration (Required for vm_development)
 DIGITALOCEAN_TOKEN=dop_v1_your_digitalocean_token
+
+# VM SSH Access (Required - base64 encoded private key)
+SSH_PRIVATE_KEY=base64_encoded_ssh_private_key
+
+# Secrets Encryption (Required for ansible-vault)
+ANSILE_VAULT_PASSWORD=your_vault_password_here
 ```
 
-**Important:** For `GITHUB_APP_PRIVATE_KEY`, copy the entire content of your `.pem` file including the header and footer lines.
+**Important Notes:**
+- For `GITHUB_APP_PRIVATE_KEY`, copy the entire content of your `.pem` file including header/footer lines
+- `SSH_PRIVATE_KEY` must be base64 encoded: `base64 -i ~/.ssh/id_rsa`
+- All sensitive playbook data is encrypted via ansible-vault using `ANSIBLE_VAULT_PASSWORD`
 
 ### 2.4 Deploy
-Railway automatically deploys when you push to main branch. Monitor logs to ensure successful deployment.
+**CRITICAL**: Always push git changes before Railway deployment:
+```bash
+git add . && git commit -m "Your changes" && git push
+```
+
+Then use Railway nuclear deployment method:
+```bash
+railway down -y && railway up
+```
+
+This clears Railway cache and ensures clean deployment.
 
 ### 2.5 Get Railway URL
 1. In Railway dashboard, find your deployment URL

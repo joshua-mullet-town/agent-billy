@@ -484,7 +484,7 @@ Currently monitoring Claude CLI execution of Issue #1188 implementation on VM 10
 **🔧 IMPLEMENTATION APPROACH:**
 
 **1. Create Test Authentication Account:**
-- **Email**: `billy-testing-givegrove@gmail.com`
+- **Email**: `billytesting2024@gmail.com`
 - **Password**: `TestBilly2024!` (stored in encrypted secrets)
 - **Security**: ALL security features disabled (no 2FA, no recovery, minimal prompts)
 - **Purpose**: Enable Billy's browser automation to authenticate to GiveGrove

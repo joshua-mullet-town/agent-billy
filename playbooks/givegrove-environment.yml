@@ -580,7 +580,13 @@
           # Track the last Claude CLI output for intelligent progression
           LAST_CLAUDE_OUTPUT=""
           
-          while true; do
+          # MAX CYCLE PROTECTION: Prevent infinite loops
+          MAX_CYCLES=20
+          CYCLE_COUNT=0
+          
+          while [ $CYCLE_COUNT -lt $MAX_CYCLES ]; do
+            CYCLE_COUNT=$((CYCLE_COUNT + 1))
+            echo "$(date): Coordinator cycle $CYCLE_COUNT/$MAX_CYCLES" >> $LOG_FILE
             echo "$(date): Polling coordinator..." >> $LOG_FILE
             
             # Read issue context from file for coordinator communication
@@ -653,6 +659,12 @@
             # Wait 30 seconds before next poll
             sleep 30
           done
+          
+          # MAX CYCLES REACHED - Log warning and cleanup
+          if [ $CYCLE_COUNT -ge $MAX_CYCLES ]; then
+            echo "$(date): WARNING - Max cycles ($MAX_CYCLES) reached, stopping coordinator to prevent runaway loops" >> $LOG_FILE
+            echo "$(date): Last Claude CLI output: $LAST_CLAUDE_OUTPUT" >> $LOG_FILE
+          fi
         dest: "/home/ubuntu/coordinator-polling.sh"
         mode: '0755'
         owner: ubuntu

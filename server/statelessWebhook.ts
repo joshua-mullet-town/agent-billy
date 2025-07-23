@@ -1406,11 +1406,19 @@ I'm ready to execute your custom implementation workflow.
                               recent_output.includes('Login page renders') ||
                               recent_output.includes('browser environment');
       
-      // Check for implementation completion indicators  
+      // Check for implementation completion indicators (ENHANCED PATTERNS)
       const implementationComplete = recent_output.includes('implemented successfully') ||
                                      recent_output.includes('already been implemented') ||
                                      recent_output.includes('successfully applied') ||
-                                     recent_output.includes('change was successful');
+                                     recent_output.includes('change was successful') ||
+                                     // ENHANCED: Content modification indicators
+                                     recent_output.includes('Summary') ||
+                                     recent_output.includes('Key Changes Made') ||
+                                     recent_output.includes('Changes Made:') ||
+                                     recent_output.includes('modernized') ||
+                                     recent_output.includes('What was preserved') ||
+                                     (recent_output.includes('updated') && recent_output.includes('content')) ||
+                                     (recent_output.includes('changed') && recent_output.length > 200);
       
       // Check for PR completion
       const prComplete = recent_output.includes('pull request') ||

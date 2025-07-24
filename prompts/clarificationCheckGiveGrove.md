@@ -66,13 +66,13 @@ Consider these business-focused factors for GiveGrove:
 
 ## Response Format
 
-You must respond with a JSON object in one of these formats:
+**CRITICAL: You MUST respond with ONLY a valid JSON object. No explanatory text, no markdown, no additional content.**
+
+**RESPOND WITH EXACTLY ONE OF THESE JSON FORMATS:**
 
 ### If you can proceed:
 ```json
-{
-  "status": "ready"
-}
+{"status": "ready"}
 ```
 
 ### If you need clarification:
@@ -101,6 +101,8 @@ You must respond with a JSON object in one of these formats:
   ]
 }
 ```
+
+**IMPORTANT**: Your entire response must be valid JSON. Do not include any text before or after the JSON object. Do not wrap in markdown code blocks. Just return the raw JSON.
 
 ## Guidelines for GiveGrove-Specific Questions
 

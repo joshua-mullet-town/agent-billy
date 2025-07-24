@@ -31,8 +31,8 @@ Complete Billy automation flow from GitHub issue label to pull request creation.
 
 ### **✅ LOCAL TESTING WORKFLOW (ABSOLUTE TRUTH)**
 - **Source of Truth**: `test-complete-environment.yml` (628 lines) - ALL iteration happens here
-- **NOT using**: GiveGrove's `claude-code-environment.yml` - that's incomplete/outdated  
-- **Workflow**: Iterate locally on `test-complete-environment.yml` → transfer to GiveGrove when proven
+- **Playbook Strategy**: Agent Billy maintains GiveGrove-specific playbooks internally  
+- **Workflow**: Iterate on `givegrove-environment.yml` → deploy directly from Agent Billy repo
 - **Current State**: Local testing phase, coordinator polling should work but needs debugging
 
 **Working code**: Billy uses `test-complete-environment.yml` in statelessWebhook.ts:287
@@ -243,7 +243,7 @@ chmod 644 secrets.yml  # CRITICAL: Fix permissions for Railway
 - **Why Local**: Quick iteration, immediate testing, no need to modify GiveGrove repo during development
 - **Current Status**: Local testing phase - debugging coordinator polling system
 - **Final Steps**: Once proven working end-to-end, transfer completed automation to GiveGrove's ansible files
-- **NOT using**: GiveGrove's `claude-code-environment.yml` (256 lines, incomplete)
+- **Playbook Strategy**: Agent Billy maintains GiveGrove playbooks internally for better control
 
 ---
 

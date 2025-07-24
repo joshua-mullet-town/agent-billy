@@ -1891,15 +1891,8 @@ Please implement this specific GitHub issue. Make the required changes as descri
       console.log(`🤔 Billy's LLM analysis FULL result: ${content}`);
 
       try {
-        // Extract JSON from markdown code blocks if present
-        let jsonString = content;
-        const jsonMatch = content.match(/```json\s*(.*?)\s*```/s);
-        if (jsonMatch) {
-          jsonString = jsonMatch[1].trim();
-        }
-        
-        // Parse JSON response from LLM
-        const analysis = JSON.parse(jsonString);
+        // Parse JSON response from LLM - NO fallback logic, strict JSON only
+        const analysis = JSON.parse(content.trim());
         
         switch (analysis.status) {
           case 'ready':
@@ -1922,14 +1915,12 @@ Please implement this specific GitHub issue. Make the required changes as descri
             console.log(`⚠️ Unknown status from LLM: ${analysis.status}, defaulting to no clarification needed`);
             return { needsClarification: false };
         }
-      } catch (error) {
-        console.error(`❌ Failed to parse LLM JSON response: ${error}. Raw content: ${content}`);
-        // Fallback to old string parsing for robustness
-        if (content.toLowerCase().includes('ready') || content.toLowerCase().includes('proceed')) {
-          return { needsClarification: false };
-        } else {
-          return { needsClarification: true, questions: 'Please provide more details about this request.' };
-        }
+      } catch (error: any) {
+        console.error(`❌ CRITICAL: LLM failed to return valid JSON. Error: ${error.message}`);
+        console.error(`❌ Raw content: ${content}`);
+        console.error(`❌ This is a prompt engineering failure - LLM must return strict JSON`);
+        // NO FALLBACK - fail hard to surface the issue
+        throw new Error(`LLM clarification response is not valid JSON: ${error.message}`);
       }
     } catch (error) {
       console.error('❌ Failed to check clarification needs:', error);

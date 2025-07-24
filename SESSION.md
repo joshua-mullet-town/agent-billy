@@ -587,3 +587,108 @@ done
 
 ### **🎯 READY FOR END-TO-END TEST:**
 All fixes applied and ready for complete automation test with loop protection.
+
+## **🐛 CRITICAL CLARIFICATION PARSING ISSUE IDENTIFIED (Current Session)**
+
+### **🔍 PROBLEM INVESTIGATION:**
+
+**Issue**: User reported that Billy has clarifying questions but fails to post them due to parsing errors, defaulting to implementation instead.
+
+**What We Discovered**:
+1. **Root Cause Found**: LLM returns valid JSON embedded in explanatory text, but Billy's parsing logic fails
+2. **Current Parsing Logic**: Only looks for JSON in markdown code blocks (`content.match(/```json\s*(.*?)\s*```/s)`)
+3. **Actual LLM Response Format**: JSON embedded in natural language explanation
+4. **Parsing Failure**: When JSON extraction fails, Billy falls back to keyword search, which often fails
+5. **Silent Failure**: Billy defaults to implementation without posting clarification questions
+
+**Example of Actual LLM Response**:
+```
+Analyzing the issue in the context of the GiveGrove platform:
+
+{
+  "status": "needs_clarification",
+  "questions": [
+    "How will this change affect the overall user experience?",
+    "What is the specific impact on mobile users?"
+  ]
+}
+
+The issue seems straightforward, but I have clarifying questions...
+```
+
+**Billy's Current Logic**:
+1. Tries to find JSON in markdown code blocks (fails)
+2. Falls back to parsing entire response as JSON (fails - has extra text)
+3. Falls back to keyword search for "ready" or "proceed" (often fails)
+4. Defaults to `needsClarification = true` but loses the actual questions
+
+### **🎯 SOLUTION APPROACH:**
+
+**Requirements**:
+- **NO fuzzy matching or keyword search** - demand rigid JSON responses
+- **Enforce strict JSON-only responses** from LLM via prompt engineering
+- **Fail hard** if response isn't valid JSON - no fallback logic
+- **Test locally** to ensure 100% JSON compliance
+
+**Next Steps**:
+1. Update clarification prompt to demand JSON-only responses
+2. Remove all fallback parsing logic
+3. Test locally with actual LLM to verify JSON compliance
+4. Deploy and test end-to-end
+
+## **🔍 DEBUGGING WEIRD NPM PACKAGE ISSUE (VM 174.138.74.197)**
+
+**Problem**: Automation failed on `npm install` with bizarre error:
+```
+npm ERR! 404 Not Found - GET https://registry.npmjs.org/stylus/-/stylus-0.64.0.tgz - Not found
+```
+
+**Context**: 
+- VM setup completed successfully (35/36 Ansible tasks OK)
+- Claude CLI authentication working (returned "4" for 2+2 test)
+- Node.js v20.5.1 installed (slightly below required 20.17.0 but should work)
+- GiveGrove repo cloned successfully
+
+**Investigation Plan**:
+1. SSH into VM and manually debug npm package resolution
+2. Check if stylus package exists in npm registry
+3. Try alternative npm install approaches
+4. Document findings and solution
+
+**Current Status**: Manually investigating package resolution issue...
+
+### **🔍 INVESTIGATION FINDINGS:**
+
+**ROOT CAUSE DISCOVERED**: The `stylus` package has been REMOVED from npm registry!
+
+**Evidence**:
+1. **npm registry check**: Only version available is `"0.0.1-security"` (security placeholder)
+2. **GiveGrove requires**: `stylus@>=0.52.4` (via stylus-loader dependency)
+3. **Registry response**: `"version not found: 0.64.0"` for the lockfile version
+4. **Fresh install error**: `No matching version found for stylus@>=0.52.4`
+
+**What happened**: The `stylus` CSS preprocessor package appears to have been deprecated/removed from npm registry, leaving only a security placeholder version. This breaks any project depending on it.
+
+**Impact**: 
+- GiveGrove's package-lock.json references `stylus-0.64.0.tgz` that no longer exists
+- Fresh installs fail because stylus-loader requires `stylus@>=0.52.4`
+- This is a **GiveGrove dependency issue**, not an Agent Billy automation issue
+
+**Next Steps**: Need to fix GiveGrove's dependency on the removed stylus package...
+
+### **🎉 PROBLEM SOLVED!**
+
+**Solution Found**: Removing `stylus-loader` from dependencies fixed the npm install issue!
+
+**What worked**:
+1. **Identified**: stylus-loader was the culprit requiring the missing stylus package
+2. **Tested**: No actual `.styl` or `.stylus` files found in GiveGrove codebase
+3. **Removed**: `npm remove stylus-loader` to eliminate the dependency
+4. **Success**: npm install completed successfully with 1,335 packages installed
+
+**Result**: 
+- ✅ Dependencies installed: 2,349 packages audited, 1,335 in node_modules
+- ✅ No stylus files found in codebase (unused dependency)
+- ✅ VM automation can now continue past this point
+
+**Fix for playbook**: Need to add `npm remove stylus-loader` to the GiveGrove environment setup to prevent this issue in future VMs.

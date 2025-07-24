@@ -102,6 +102,8 @@ This tracks the big milestones from current webhook server to fully functional i
 ### Phase 4: Polish & Scale  
 - [ ] **Multi-repository support** - Different repos can configure different Billy behaviors
 - [ ] **Coming up for air** - After starting to code, have Billy recognize that he has more clarifying questions that he then posts back on the ticket
+- [ ] **CRITICAL: Fix clarification parsing** - Clarifying questions portion has parsing errors, seems to default to implementing instead of asking questions
+- [ ] **CRITICAL: Better error reporting** - When VM environment setup fails (like Ansible failures), Billy should comment back on the GitHub issue explaining what went wrong and current status, rather than silently failing
 - [ ] **Production reliability** - Enhanced error handling, monitoring, cost management
 - [ ] **Advanced features** - PR review, cross-repo operations, chat interface
 
@@ -112,6 +114,7 @@ This tracks the big milestones from current webhook server to fully functional i
 - [ ] **Design instruction architecture** - Two-layer approach: stable config (`.github/billy-config.yml`) vs dynamic instructions (`CLAUDE.md`)
 
 ### Monitoring & Intelligence  
+- [ ] **Clarifying Questions Improvments** - Flow could include way better context, currently buggy.
 - [ ] **Error handling & monitoring** - Detect when services go down during autonomous work, better Railway log monitoring
 - [ ] **"Coming up for air" feature** - Enable Claude Code to ask stakeholders questions mid-implementation via GitHub comments
 
